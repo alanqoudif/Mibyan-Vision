@@ -103,7 +103,7 @@ const MODE_PROMPTS: Record<Lang, Record<string, string>> = {
       "هذا منيو أو فاتورة أو ورقة فيها أسعار. لا تقرأ كل شي. لخص: نوعه، الأقسام، ومدى الأسعار. للفاتورة: المبلغ المطلوب والتاريخ وأهم البنود. إذا سأل سؤال (مثل أرخص شي أو أقل من مبلغ)، جاوبه بالأرقام.",
     ask: "جاوب سؤاله بالاعتماد على الصورة إذا لها علاقة.",
     where:
-      "قول له وين هو بجملة أو جملتين: استخدم معلومات الموقع المرفقة (الحي والشارع والأماكن القريبة) مع اللي تشوفه في الصورة (لوحات المحلات، مدخل، رصيف، موقف). إذا شفت لوحة محل أو مدخل، قول وين هو بالنسبة له. لا تقرأ إحداثيات ولا رموز بريدية. إذا الموقع والصورة ما يتفقون، اعتمد على الصورة وقول إن الموقع تقريبي.",
+      "قول له وين هو بجملة أو جملتين: استخدم معلومات الموقع المرفقة (الحي والشارع والأماكن القريبة) مع اللي تشوفه في الصورة (لوحات المحلات، مدخل، رصيف، موقف). إذا شفت لوحة محل أو مدخل، قول وين هو بالنسبة له. لا تقرأ إحداثيات ولا رموز بريدية. إذا الموقع والصورة ما يتفقون، اعتمد على الصورة وقول إن الموقع تقريبي. لا تذكر أي شي حوله (أبواب، طاولات، ناس، لوحات) إلا إذا شفته فعلًا في الصورة.",
     meds: `يبي يتأكد إن الدواء اللي بيده هو الصح قبل ما ياخذه. أدويته المسجلة مرفقة قبل الصورة الأخيرة: لكل دواء اسمه ووصفه وصورة علبته.
 - قارن العلبة في الصورة الأخيرة بأدويته المسجلة: الاسم المكتوب، التركيز، الشكل واللون.
 - ابدأ ردك بأول كلمة واضحة: "نعم" إذا متأكد إنه واحد منها وقول أي واحد، أو "لا، انتبه" إذا مو من أدويته أو مختلف التركيز وقول وش هو، أو "مو متأكد" إذا الاسم مو واضح وقول له يلف العلبة.
@@ -132,7 +132,7 @@ const MODE_PROMPTS: Record<Lang, Record<string, string>> = {
       "This is a menu, bill or something with prices. Do not read everything. Summarize: what it is, the sections and the price range. For a bill: the amount due, the date and the main items. If they ask a question (like the cheapest item or what is under an amount), answer with numbers.",
     ask: "Answer their question, using the image when it is relevant.",
     where:
-      "Tell them where they are in one or two sentences: combine the location info provided (district, street, nearby places) with what you see (shop signs, an entrance, sidewalk, parking). If you see a sign or an entrance, say where it is relative to them. Never read coordinates or postcodes. If the location and the image disagree, trust the image and say the location is approximate.",
+      "Tell them where they are in one or two sentences: combine the location info provided (district, street, nearby places) with what you see (shop signs, an entrance, sidewalk, parking). If you see a sign or an entrance, say where it is relative to them. Never read coordinates or postcodes. If the location and the image disagree, trust the image and say the location is approximate. Never mention anything around them (doors, desks, people, signs) unless you actually see it in the image.",
     meds: `They want to make sure the medicine in their hand is the right one before taking it. Their saved medicines come before the last image: each one's name, description and a photo of its box.
 - Compare the box in the last image with their saved medicines: printed name, strength, shape and color.
 - Start with one clear first word: "Yes" if you're sure it's one of them, and say which; "No, careful" if it's not one of theirs or the strength differs, and say what it is; or "Not sure" if the name isn't readable, and ask them to turn the box.
@@ -220,6 +220,18 @@ const MED_SAVE: Record<Lang, string> = {
 const MED_REF: Record<Lang, (name: string, note: string) => string> = {
   ar: (name, note) => `دواء مسجل: ${name}${note ? ` (${note})` : ""}`,
   en: (name, note) => `Saved medicine: ${name}${note ? ` (${note})` : ""}`,
+};
+
+// "Where am I" without a usable photo: the location is all there is, so say only that.
+const WHERE_NO_IMAGE: Record<Lang, string> = {
+  ar: "ما وصلتك صورة هالمرة. قول له وين هو من معلومات الموقع بس، ولا توصف أي شي حوله أبدًا لأنك ما تشوف. وقول له إذا يبي تعرف وش قدامه يوجه راسه أو يشغل النظارة.",
+  en: "No photo came with this request. Tell them where they are from the location info only, and never describe anything around them, because you can't see. Tell them to face forward or turn on the glasses if they want to know what's in front of them.",
+};
+
+// "Where am I" with neither a photo nor a location fix: nothing to go on.
+const WHERE_NOTHING: Record<Lang, string> = {
+  ar: "ما وصلك موقع ولا صورة. قول له بصراحة إنك ما تقدر تعرف وين هو الحين، واقترح يفعّل الموقع لمبيان أو يشغل النظارة. لا تخمن.",
+  en: "You got neither a location nor a photo. Tell them honestly you can't tell where they are right now, and suggest allowing location for Mubayan or turning on the glasses. Don't guess.",
 };
 
 const PLACE: Record<Lang, (place: string) => string> = {
@@ -322,9 +334,8 @@ Deno.serve(async (req) => {
     content.push({ type: "text", text: MED_REF[lang](String(m.name).slice(0, 60), typeof m.note === "string" ? m.note.slice(0, 200) : "") });
     content.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${m.image}` } });
   }
-  if (mode === "where" && typeof body.place === "string" && body.place) {
-    content.push({ type: "text", text: PLACE[lang](body.place.slice(0, 600)) });
-  }
+  const hasPlace = mode === "where" && typeof body.place === "string" && !!body.place;
+  if (hasPlace) content.push({ type: "text", text: PLACE[lang](body.place.slice(0, 600)) });
   if (mode === "guide" && body.text) content.push({ type: "text", text: GUIDE_TARGET[lang](String(body.text).slice(0, 200)) });
   else if (body.text) content.push({ type: "text", text: String(body.text).slice(0, 2000) });
   if (mode === "guide" && body.audio) content.push({ type: "text", text: GUIDE_ASK[lang] });
@@ -349,6 +360,7 @@ Deno.serve(async (req) => {
       SEES_BELONGINGS.has(mode) ? SEEN[lang] : "",
       faces.length ? FACES[lang](faces.map((f: any) => f.name)) : "",
       mode === "people" && body.faces_enabled ? FACE_ENROLL[lang] : "",
+      mode === "where" && !body.image ? (hasPlace ? WHERE_NO_IMAGE[lang] : WHERE_NOTHING[lang]) : "",
     ].filter(Boolean);
     system = `${base}\n\n${MODE_PROMPTS[lang][mode]}\n${detail}${extra.length ? `\n${extra.join("\n")}` : ""}${memory.length ? MEMORY[lang](memory) : ""}`;
   }
