@@ -1,18 +1,28 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { Palettes } from '@/constants/theme';
+import { SettingsProvider } from '@/lib/settings';
 
-SplashScreen.preventAutoHideAsync();
+export default function RootLayout() {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Palettes[scheme];
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <SettingsProvider>
+      <ThemeProvider value={{ ...base, colors: { ...base.colors, background: c.background, card: c.background } }}>
+        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.background } }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="session" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="live" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="find" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="helper" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="help-view" options={{ presentation: 'modal' }} />
+        </Stack>
+      </ThemeProvider>
+    </SettingsProvider>
   );
 }
