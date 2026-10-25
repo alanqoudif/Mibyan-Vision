@@ -2,7 +2,10 @@ import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
+  setIsAudioActiveAsync,
   useAudioRecorder,
+  type AudioMode,
+  type AudioRecorder,
 } from 'expo-audio';
 import { File } from 'expo-file-system';
 import { useCallback, useEffect, useRef } from 'react';
@@ -13,6 +16,26 @@ const LOUD_DB = -38;
 const SILENCE_MS = 1300;
 const NO_VOICE_MS = 7000;
 const MAX_LISTEN_MS = 15000;
+
+/**
+ * Switches the audio session to recording and prepares `recorder`. Right after playback iOS
+ * can refuse to activate the session ("Session activation failed"), so on failure this resets
+ * the session once and tries again.
+ */
+export async function prepareMic(recorder: AudioRecorder, extra: Partial<AudioMode> = {}) {
+  const mode = { allowsRecording: true, playsInSilentMode: true, ...extra };
+  try {
+    await setAudioModeAsync(mode);
+    await recorder.prepareToRecordAsync();
+  } catch (e) {
+    console.warn('mic busy, resetting audio session', e);
+    await setIsAudioActiveAsync(false).catch(() => {});
+    await new Promise((r) => setTimeout(r, 250));
+    await setIsAudioActiveAsync(true);
+    await setAudioModeAsync(mode);
+    await recorder.prepareToRecordAsync();
+  }
+}
 
 /**
  * One spoken answer: opens the mic, waits for speech then a pause, and resolves with the
@@ -35,8 +58,7 @@ export function useListen() {
     cancelled.current = false;
     const perm = await requestRecordingPermissionsAsync();
     if (!perm.granted) return undefined;
-    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-    await recorder.prepareToRecordAsync();
+    await prepareMic(recorder);
     recorder.record();
     Earcons.play('listen');
 

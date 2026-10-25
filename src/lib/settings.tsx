@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 import * as Earcons from '@/lib/earcons';
 import { readJSON, writeJSON } from '@/lib/storage';
+import * as Voice from '@/lib/voice';
 
 export type Settings = {
   lang: 'ar' | 'en';
@@ -21,6 +22,10 @@ export type Settings = {
   bargeIn: boolean;
   /** Name people the user enrolled. Only offered when FACES_ALLOWED (see lib/faces). */
   faces: boolean;
+  /** "Chair at 2 o'clock, 3 steps" (O&M style) or plain left/right. */
+  directions: 'clock' | 'simple';
+  /** With VoiceOver on, speak answers through VoiceOver (its voice and rate) instead of the app's. */
+  voiceOver: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -35,6 +40,8 @@ const DEFAULTS: Settings = {
   framing: true,
   bargeIn: false,
   faces: false,
+  directions: 'clock',
+  voiceOver: true,
 };
 
 export const SPEECH_RATE: Record<Settings['speed'], number> = { slow: 0.85, normal: 1, fast: 1.2 };
@@ -44,6 +51,7 @@ const Ctx = createContext<{ settings: Settings; update: (p: Partial<Settings>) =
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(() => ({ ...DEFAULTS, ...readJSON('settings', {}) }));
   useEffect(() => Earcons.setEnabled(settings.sounds), [settings.sounds]);
+  useEffect(() => Voice.setPreferScreenReader(settings.voiceOver), [settings.voiceOver]);
   const update = (patch: Partial<Settings>) =>
     setSettings((s) => {
       const next = { ...s, ...patch };

@@ -25,3 +25,33 @@ export function matchCommand(question: string): Command | null {
   if (DETAIL.test(q)) return 'detail';
   return null;
 }
+
+const QIBLA = /(القبله|اتجاه الكعبه|qibla)/;
+const LIVE = /(الوضع المباشر|راقب معي|live mode|watch with me)/;
+const WHERE = /(وين انا|فين انا|where am i)/;
+const CALL = /^(اتصل|اتصلي|كلم|نادي|call|ring|get)\s+(.+)$/;
+const ANYONE = /(احد|حد|someone|anyone|somebody|help)/;
+
+export type SpokenRoute =
+  | { pathname: '/qibla' }
+  | { pathname: '/live' }
+  | { pathname: '/session'; params: { mode: 'where' } }
+  | { pathname: '/helper'; params: { notify: string } };
+
+/**
+ * Questions that are really "open that screen": "where's the qibla", "call mom to see with me",
+ * "where am I", "start live mode". `contactId` resolves a spoken name to a trusted helper.
+ */
+export function matchRoute(question: string, contactId: (text: string) => number | undefined): SpokenRoute | null {
+  const q = normalize(question).replace(/^(يا )?مبيان /, '');
+  const call = q.match(CALL);
+  if (call) {
+    const id = contactId(question);
+    if (id !== undefined) return { pathname: '/helper', params: { notify: String(id) } };
+    if (ANYONE.test(call[2])) return { pathname: '/helper', params: { notify: 'all' } };
+  }
+  if (QIBLA.test(q)) return { pathname: '/qibla' };
+  if (LIVE.test(q)) return { pathname: '/live' };
+  if (WHERE.test(q)) return { pathname: '/session', params: { mode: 'where' } };
+  return null;
+}

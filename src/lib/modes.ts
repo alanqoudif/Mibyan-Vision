@@ -4,10 +4,12 @@ import type { Lang } from '@/lib/i18n';
 
 export type ModeId =
   | 'describe'
+  | 'where'
   | 'read'
   | 'find'
   | 'money'
   | 'product'
+  | 'meds'
   | 'screen'
   | 'clothes'
   | 'menu'
@@ -38,6 +40,15 @@ export const MODES: Mode[] = [
     en: { title: 'Describe scene', prompt: 'Describe what’s in front of me' },
     icon: 'eye.fill',
     tint: ['#0064E0', '#00C6FF'],
+    followUp: true,
+  },
+  {
+    id: 'where',
+    title: 'وين أنا؟',
+    prompt: 'وين أنا الحين؟ ووش حولي؟',
+    en: { title: 'Where am I?', prompt: 'Where am I, and what’s around me?' },
+    icon: 'mappin.and.ellipse',
+    tint: ['#1E88E5', '#26C6DA'],
     followUp: true,
   },
   {
@@ -74,6 +85,16 @@ export const MODES: Mode[] = [
     en: { title: 'Products & medicine', prompt: 'What is this box, and when does it expire?' },
     icon: 'pills.fill',
     tint: ['#00897B', '#4DD0C4'],
+    framing: true,
+    followUp: true,
+  },
+  {
+    id: 'meds',
+    title: 'تأكد من الدواء',
+    prompt: 'هذا الدواء الصح؟',
+    en: { title: 'Check my medicine', prompt: 'Is this the right medicine?' },
+    icon: 'checkmark.shield.fill',
+    tint: ['#2E7D32', '#81C784'],
     framing: true,
     followUp: true,
   },

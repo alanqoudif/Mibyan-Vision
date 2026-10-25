@@ -29,6 +29,12 @@ export type AssistRequest = {
   /** Enrolled people for `people` mode (see lib/faces). */
   faces?: { name: string; image: string }[];
   faces_enabled?: boolean;
+  /** The user's saved medicines for `meds` mode (see lib/meds). */
+  meds?: { name: string; note: string; image: string }[];
+  /** Clock positions and steps (default), or plain left/right. */
+  directions?: 'clock' | 'simple';
+  /** For `where`: the street address and nearby place names from GPS (see lib/place). */
+  place?: string;
 };
 
 /** What the live-mode model answers when nothing worth saying has changed. */
@@ -82,16 +88,17 @@ export async function streamAssist(
   return full;
 }
 
-const TAG = /<(seen|remember|face):([^>]*)>/g;
+const TAG = /<(seen|remember|face|med):([^>]*)>/g;
 
 export type Tags = {
   seen: { item: string; place: string }[];
   remember: { label: string; note: string }[];
   faces: string[];
+  meds: { name: string; note: string }[];
 };
 
 /**
- * The answer without the hidden memory/face tags, safe to show and speak while streaming:
+ * The answer without the hidden memory/face/medicine tags, safe to show and speak while streaming:
  * a tag that hasn't closed yet is held back.
  */
 export function visibleText(answer: string): string {
@@ -101,7 +108,7 @@ export function visibleText(answer: string): string {
 }
 
 export function parseTags(answer: string): Tags {
-  const tags: Tags = { seen: [], remember: [], faces: [] };
+  const tags: Tags = { seen: [], remember: [], faces: [], meds: [] };
   for (const [, kind, raw] of answer.matchAll(TAG)) {
     const body = raw.trim();
     if (kind === 'seen') {
@@ -109,9 +116,11 @@ export function parseTags(answer: string): Tags {
         const [item, ...place] = part.split(' - ');
         if (item?.trim() && place.length) tags.seen.push({ item: item.trim(), place: place.join(' - ').trim() });
       }
-    } else if (kind === 'remember') {
+    } else if (kind === 'remember' || kind === 'med') {
       const [label, ...note] = body.split('|');
-      if (label?.trim()) tags.remember.push({ label: label.trim(), note: note.join('|').trim() });
+      if (!label?.trim()) continue;
+      if (kind === 'med') tags.meds.push({ name: label.trim(), note: note.join('|').trim() });
+      else tags.remember.push({ label: label.trim(), note: note.join('|').trim() });
     } else if (body) {
       tags.faces.push(body);
     }

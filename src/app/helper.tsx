@@ -3,8 +3,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useKeepAwake } from 'expo-keep-awake';
-import { useRouter } from 'expo-router';
-import * as Speech from 'expo-speech';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
@@ -18,18 +17,22 @@ import { captureFromGlasses, stopGlasses, takeGlassesNotice } from '@/lib/glasse
 import { HelperEnded, formatCode, sendFrame, spokenCode, startSharing, stopSharing } from '@/lib/helper';
 import { useI18n } from '@/lib/i18n';
 import { SPEECH_RATE, useSettings } from '@/lib/settings';
+import * as Voice from '@/lib/voice';
 
 const FRAME_GAP_MS = 1200;
 
 type Msg = { id: number; body: string };
 
 /**
- * "Someone see with me": shares the glasses view with a trusted person. They enter the code in
- * their own copy of the app, watch the frames and send short directions, which are read aloud.
+ * "Someone see with me": shares the glasses view with a trusted person, who watches the frames
+ * and sends short directions that are read aloud. With `notify` ("all" or a contact id, from
+ * Siri or "call mom"), saved helpers get a notification that opens the view; otherwise, or if
+ * none could be reached, the code is read out and shared.
  * Voice goes over a normal phone call; this screen only carries the picture and the messages.
  */
 export default function HelperScreen() {
   useKeepAwake();
+  const { notify } = useLocalSearchParams<{ notify?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
@@ -51,7 +54,7 @@ export default function HelperScreen() {
   const joinedRef = useRef(false);
 
   const say = useCallback(
-    (text: string) => Speech.speak(text, { language: speechLang, rate: SPEECH_RATE[settings.speed] }),
+    (text: string) => Voice.speakNow(text, { language: speechLang, rate: SPEECH_RATE[settings.speed] }),
     [settings.speed, speechLang],
   );
 
@@ -81,8 +84,11 @@ export default function HelperScreen() {
       if (!camPerm?.granted) await requestCamPerm();
       await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
       let newCode: string;
+      let notified: string[];
       try {
-        newCode = await startSharing();
+        ({ code: newCode, notified } = await startSharing(
+          notify === 'all' ? 'all' : notify && Number.isInteger(Number(notify)) ? Number(notify) : undefined,
+        ));
       } catch {
         setFailed(true);
         Earcons.play('error');
@@ -92,8 +98,13 @@ export default function HelperScreen() {
       if (!alive.current) return stopSharing(newCode);
       codeRef.current = newCode;
       setCode(newCode);
-      say(t.helperCodeSpoken(spokenCode(newCode)));
-      share(newCode);
+      if (notified.length) {
+        say(t.helperNotified(notified));
+      } else {
+        if (notify) say(t.helperNobodyReached);
+        say(t.helperCodeSpoken(spokenCode(newCode)));
+        share(newCode);
+      }
 
       // Upload a frame, read any new messages, repeat.
       while (alive.current) {
@@ -128,7 +139,7 @@ export default function HelperScreen() {
     })();
     return () => {
       alive.current = false;
-      Speech.stop();
+      Voice.stop();
       if (codeRef.current) stopSharing(codeRef.current);
       stopGlasses();
     };
@@ -138,7 +149,7 @@ export default function HelperScreen() {
 
   const close = () => {
     alive.current = false;
-    Speech.stop();
+    Voice.stop();
     router.back();
   };
 
@@ -181,6 +192,17 @@ export default function HelperScreen() {
         </View>
 
         <Text tone="secondary">{t.helperHowTo}</Text>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityHint={t.contactsHint}
+          onPress={() => router.push('/contacts')}
+          style={({ pressed }) => [styles.link, { backgroundColor: c.surface, opacity: pressed ? 0.6 : 1 }]}>
+          <SymbolView name="person.crop.circle.badge.plus" size={22} tintColor={c.text} />
+          <Text variant="heading" style={{ flex: 1 }}>
+            {t.contactsTitle}
+          </Text>
+        </Pressable>
 
         {failed && (
           <Text variant="body" style={{ color: c.stopText }}>
@@ -234,6 +256,7 @@ const styles = StyleSheet.create({
   codeCard: { borderRadius: Radius.lg, padding: Spacing.four, gap: Spacing.two, alignItems: 'center' },
   code: { letterSpacing: 4, fontVariant: ['tabular-nums'] },
   bubble: { padding: Spacing.three, borderRadius: Radius.md },
+  link: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, padding: Spacing.three, minHeight: 56, borderRadius: Radius.md },
   controls: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, alignItems: 'center' },
   pill: {
     flexDirection: 'row',

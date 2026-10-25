@@ -27,7 +27,7 @@ const cors = {
 const SILENT = "<silent>";
 const OK = "<ok>";
 /** Hidden tags the app parses out of answers (memory, faces). Never stored or spoken. */
-const TAGS = /<(seen|remember|face):[^>]*>/g;
+const TAGS = /<(seen|remember|face|med):[^>]*>/g;
 
 type Lang = "ar" | "en";
 
@@ -36,7 +36,7 @@ const BASE: Record<Lang, string> = {
 - تكلم بلهجة خليجية بسيطة وودودة، وجمل قصيرة لأن ردك ينقرا بصوت عالي.
 - لا تستخدم ماركداون ولا رموز ولا قوائم مرقمة ولا إيموجي.
 - ابدأ دايمًا بأهم شي، وإذا فيه خطر (سيارة، درج، حفرة، عائق، شي حار) قوله أول كلمة.
-- استخدم اتجاهات واضحة: قدامك، يمينك، يسارك، على بعد كم خطوة، أو اتجاه الساعة.
+{DIRECTIONS}
 - لا تحاول تعرف هوية الأشخاص من وجوههم؛ وصف شكلهم وتصرفهم بس.
 - إذا الصورة مو واضحة أو مظلمة، قول له يحرك راسه أو يقرّب، ولا تألف.
 - إذا وصلك صوت، اكتب أول سطر بالضبط بهالشكل: § ثم نص سؤاله كما سمعته، وبعدين سطر جديد وجوابك.
@@ -45,11 +45,24 @@ const BASE: Record<Lang, string> = {
 - Speak in plain, warm, everyday English with short sentences, because your reply is read aloud.
 - No markdown, symbols, numbered lists or emoji.
 - Always lead with the most important thing. If there is any hazard (car, stairs, hole, obstacle, something hot), say it first.
-- Use clear directions: in front of you, on your left, on your right, how many steps away, or clock positions.
+{DIRECTIONS}
 - Never try to identify people from their faces; only describe how they look and what they are doing.
 - If the image is blurry or dark, ask them to move their head or get closer. Never make things up.
 - If you receive audio, write the first line exactly as: § followed by their question as you heard it, then a new line, then your answer.
 - If they say "briefly" or "shorter", repeat your last answer in one or two sentences. If they say "in detail" or "more detail", repeat it with more detail.`,
+};
+
+// How to give directions. Clock positions and steps are what orientation & mobility training
+// teaches; "simple" is for users who prefer left/right.
+const DIRECTIONS: Record<Lang, { clock: string; simple: string }> = {
+  ar: {
+    clock: `- للاتجاهات استخدم نظام الساعة والخطوات اللي يتدرب عليه المكفوفين: الساعة ١٢ قدامه مباشرة، ٣ يمينه، ٩ يساره، ٦ وراه. مثل "الكرسي على الساعة ٢، تقريبًا ٣ خطوات". الخطوة تقريبًا ٧٠ سم. للأشياء اللي في متناول يده قول مثل "قدام يدك اليمين، على بعد شبر".`,
+    simple: `- استخدم اتجاهات واضحة: قدامك، يمينك، يسارك، ورا، وكم خطوة تقريبًا (الخطوة ٧٠ سم).`,
+  },
+  en: {
+    clock: `- Give directions the way orientation and mobility training teaches: clock positions and steps. 12 o'clock is straight ahead, 3 is right, 9 is left, 6 is behind. For example "chair at 2 o'clock, about 3 steps". A step is about 70 cm. For things within reach say e.g. "just in front of your right hand, a hand's width away".`,
+    simple: `- Use clear directions: in front of you, on your left, on your right, behind you, and roughly how many steps (a step is about 70 cm).`,
+  },
 };
 
 // Appended to modes that look at belongings, so the app can answer "where did I leave my keys?" later.
@@ -89,6 +102,14 @@ const MODE_PROMPTS: Record<Lang, Record<string, string>> = {
     menu:
       "هذا منيو أو فاتورة أو ورقة فيها أسعار. لا تقرأ كل شي. لخص: نوعه، الأقسام، ومدى الأسعار. للفاتورة: المبلغ المطلوب والتاريخ وأهم البنود. إذا سأل سؤال (مثل أرخص شي أو أقل من مبلغ)، جاوبه بالأرقام.",
     ask: "جاوب سؤاله بالاعتماد على الصورة إذا لها علاقة.",
+    where:
+      "قول له وين هو بجملة أو جملتين: استخدم معلومات الموقع المرفقة (الحي والشارع والأماكن القريبة) مع اللي تشوفه في الصورة (لوحات المحلات، مدخل، رصيف، موقف). إذا شفت لوحة محل أو مدخل، قول وين هو بالنسبة له. لا تقرأ إحداثيات ولا رموز بريدية. إذا الموقع والصورة ما يتفقون، اعتمد على الصورة وقول إن الموقع تقريبي.",
+    meds: `يبي يتأكد إن الدواء اللي بيده هو الصح قبل ما ياخذه. أدويته المسجلة مرفقة قبل الصورة الأخيرة: لكل دواء اسمه ووصفه وصورة علبته.
+- قارن العلبة في الصورة الأخيرة بأدويته المسجلة: الاسم المكتوب، التركيز، الشكل واللون.
+- ابدأ ردك بأول كلمة واضحة: "نعم" إذا متأكد إنه واحد منها وقول أي واحد، أو "لا، انتبه" إذا مو من أدويته أو مختلف التركيز وقول وش هو، أو "مو متأكد" إذا الاسم مو واضح وقول له يلف العلبة.
+- إذا التركيز مختلف عن المسجل، نبّه عليه حتى لو الاسم نفسه.
+- اقرأ تاريخ الانتهاء إذا ظاهر، وإذا منتهي قول هذا قبل أي شي.
+- إذا ما فيه أدوية مسجلة، قول وش الدواء وعلمه يقدر يقول "سجّل هذا دواء ..." عشان تتذكره.`,
     live: `أنت في الوضع المباشر: توصلك صورة جديدة كل كم ثانية وهو يمشي أو يتحرك.
 القواعد:
 - إذا اللي تشوفه هو نفس اللي قلته قبل أو قريب منه، أو ما فيه شي مهم، رد بـ ${SILENT} فقط وبدون أي كلمة ثانية. هذا هو الرد المتوقع أغلب الوقت.
@@ -110,6 +131,14 @@ const MODE_PROMPTS: Record<Lang, Record<string, string>> = {
     menu:
       "This is a menu, bill or something with prices. Do not read everything. Summarize: what it is, the sections and the price range. For a bill: the amount due, the date and the main items. If they ask a question (like the cheapest item or what is under an amount), answer with numbers.",
     ask: "Answer their question, using the image when it is relevant.",
+    where:
+      "Tell them where they are in one or two sentences: combine the location info provided (district, street, nearby places) with what you see (shop signs, an entrance, sidewalk, parking). If you see a sign or an entrance, say where it is relative to them. Never read coordinates or postcodes. If the location and the image disagree, trust the image and say the location is approximate.",
+    meds: `They want to make sure the medicine in their hand is the right one before taking it. Their saved medicines come before the last image: each one's name, description and a photo of its box.
+- Compare the box in the last image with their saved medicines: printed name, strength, shape and color.
+- Start with one clear first word: "Yes" if you're sure it's one of them, and say which; "No, careful" if it's not one of theirs or the strength differs, and say what it is; or "Not sure" if the name isn't readable, and ask them to turn the box.
+- If the strength differs from the saved one, warn them even if the name matches.
+- Read the expiry date if visible; if it has expired, say so before anything else.
+- If they have no saved medicines, say what this one is and tell them they can say "save this as my ... medicine" so you'll remember it.`,
     live: `You are in live mode: you receive a new frame every few seconds while they walk or move around.
 Rules:
 - If what you see is the same as, or close to, what you already told them, or nothing matters, reply with ${SILENT} only and nothing else. This is the expected reply most of the time.
@@ -127,6 +156,7 @@ const FRAME_GOAL: Record<Lang, Record<string, string>> = {
     screen: "الشاشة أو الأزرار كاملة ومقروءة",
     menu: "المنيو أو الفاتورة كاملة ومقروءة",
     clothes: "قطعة الملابس كاملة",
+    meds: "علبة الدواء مع اسمه وتركيزه مقروءة",
   },
   en: {
     read: "a whole, readable page or text",
@@ -135,6 +165,7 @@ const FRAME_GOAL: Record<Lang, Record<string, string>> = {
     screen: "the whole display or buttons, readable",
     menu: "the whole menu or bill, readable",
     clothes: "the whole piece of clothing",
+    meds: "the medicine box with its name and strength readable",
   },
 };
 
@@ -181,6 +212,21 @@ const FACES: Record<Lang, (names: string[]) => string> = {
   en: (names) => `Exception: the user enrolled these people's faces with their consent; their reference photos come before the last image: ${names.join(", ")}. If one of them is in the last image and you are confident, say their name. If unsure, do not guess. Never try to identify anyone else.`,
 };
 
+const MED_SAVE: Record<Lang, string> = {
+  ar: `إذا قال "سجّل هذا دواء ..." أو "هذا علاج ..." وفيه علبة واضحة، أكد له بجملة قصيرة فيها الاسم والتركيز اللي قريته، واكتب في آخر ردك على سطر لحاله: <med: الاسم اللي قاله | اسم الدواء المكتوب والتركيز والشكل>.`,
+  en: `If they say "save this as my ... medicine" or "this is my ... medicine" and a box is clearly visible, confirm in one short sentence with the name and strength you read, and at the very end on its own line write: <med: the name they gave | printed name, strength and look>.`,
+};
+
+const MED_REF: Record<Lang, (name: string, note: string) => string> = {
+  ar: (name, note) => `دواء مسجل: ${name}${note ? ` (${note})` : ""}`,
+  en: (name, note) => `Saved medicine: ${name}${note ? ` (${note})` : ""}`,
+};
+
+const PLACE: Record<Lang, (place: string) => string> = {
+  ar: (place) => `معلومات الموقع من الجوال: ${place}`,
+  en: (place) => `Location from the phone: ${place}`,
+};
+
 const FACE_ENROLL: Record<Lang, string> = {
   ar: `إذا قال لك "سجّل هذا الشخص باسم ..." وفيه شخص واحد واضح قدامه، قول له يتأكد إن الشخص موافق، واكتب في آخر ردك على سطر لحاله: <face: الاسم>.`,
   en: `If they say "save this person as ..." and exactly one person is clearly in front of them, remind them to make sure that person agrees, and at the very end on its own line write: <face: the name>.`,
@@ -206,6 +252,7 @@ const FALLBACK_Q: Record<Lang, string> = { ar: "وصف لي اللي قدامي.
 /** Modes that note belongings for the memory, and modes that can be told to remember things. */
 const SEES_BELONGINGS = new Set(["describe", "find", "ask"]);
 const CAN_REMEMBER = new Set(["ask", "describe", "find", "product"]);
+const CAN_SAVE_MED = new Set(["meds", "product"]);
 const USES_MEMORY = new Set(["ask", "find", "guide"]);
 /** Helper modes that run several times a second: not worth a history row. */
 const UNSAVED = new Set(["frame", "guide"]);
@@ -250,6 +297,11 @@ Deno.serve(async (req) => {
   const model = MODELS[body.model] ?? MODELS.smart;
   const detail = DETAIL[lang][body.detail === false ? 1 : 0];
   const memory = USES_MEMORY.has(mode) ? strings(body.memory, 40, 200) : [];
+  const meds = mode === "meds" && Array.isArray(body.meds)
+    ? body.meds
+        .filter((m: any) => m && typeof m.name === "string" && typeof m.image === "string")
+        .slice(0, 8)
+    : [];
   const faces = mode === "people" && Array.isArray(body.faces)
     ? body.faces
         .filter((f: any) => f && typeof f.name === "string" && typeof f.image === "string")
@@ -266,6 +318,13 @@ Deno.serve(async (req) => {
     content.push({ type: "text", text: String(f.name).slice(0, 60) });
     content.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${f.image}` } });
   }
+  for (const m of meds) {
+    content.push({ type: "text", text: MED_REF[lang](String(m.name).slice(0, 60), typeof m.note === "string" ? m.note.slice(0, 200) : "") });
+    content.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${m.image}` } });
+  }
+  if (mode === "where" && typeof body.place === "string" && body.place) {
+    content.push({ type: "text", text: PLACE[lang](body.place.slice(0, 600)) });
+  }
   if (mode === "guide" && body.text) content.push({ type: "text", text: GUIDE_TARGET[lang](String(body.text).slice(0, 200)) });
   else if (body.text) content.push({ type: "text", text: String(body.text).slice(0, 2000) });
   if (mode === "guide" && body.audio) content.push({ type: "text", text: GUIDE_ASK[lang] });
@@ -273,6 +332,7 @@ Deno.serve(async (req) => {
   if (body.image) content.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${body.image}` } });
   if (!content.length) content.push({ type: "text", text: FALLBACK_Q[lang] });
 
+  const base = BASE[lang].replace("{DIRECTIONS}", DIRECTIONS[lang][body.directions === "simple" ? "simple" : "clock"]);
   let system: string;
   if (mode === "frame") {
     system = FRAME_PROMPT[lang](FRAME_GOAL[lang][String(body.target)] ?? FRAME_GOAL[lang].read);
@@ -280,16 +340,17 @@ Deno.serve(async (req) => {
     system = GUIDE_PROMPT[lang] + (memory.length ? MEMORY[lang](memory) : "");
   } else if (live) {
     // Past narrations go into the system prompt as "already said", which the model respects far better than chat turns.
-    system = `${BASE[lang]}\n\n${MODE_PROMPTS[lang].live}${LIVE_CONTEXT[lang](history.map((m: any) => m.content).slice(-6))}`;
+    system = `${base}\n\n${MODE_PROMPTS[lang].live}${LIVE_CONTEXT[lang](history.map((m: any) => m.content).slice(-6))}`;
   } else {
     const extra = [
       mode !== "ask" && (body.audio || body.text) ? FOLLOW_UP[lang] : "",
       CAN_REMEMBER.has(mode) ? REMEMBER[lang] : "",
+      CAN_SAVE_MED.has(mode) ? MED_SAVE[lang] : "",
       SEES_BELONGINGS.has(mode) ? SEEN[lang] : "",
       faces.length ? FACES[lang](faces.map((f: any) => f.name)) : "",
       mode === "people" && body.faces_enabled ? FACE_ENROLL[lang] : "",
     ].filter(Boolean);
-    system = `${BASE[lang]}\n\n${MODE_PROMPTS[lang][mode]}\n${detail}${extra.length ? `\n${extra.join("\n")}` : ""}${memory.length ? MEMORY[lang](memory) : ""}`;
+    system = `${base}\n\n${MODE_PROMPTS[lang][mode]}\n${detail}${extra.length ? `\n${extra.join("\n")}` : ""}${memory.length ? MEMORY[lang](memory) : ""}`;
   }
   const messages = live || mode === "frame"
     ? [{ role: "system", content: system }, { role: "user", content }]

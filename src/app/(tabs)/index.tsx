@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,6 +11,7 @@ import { OrbMark } from '@/components/orb';
 import { Text } from '@/components/text';
 import { BottomTabInset, OrbColors, Radius, Spacing, useColors } from '@/constants/theme';
 import { useGlasses } from '@/lib/glasses';
+import { useContacts } from '@/lib/helper';
 import { useI18n } from '@/lib/i18n';
 import { SUGGESTIONS, modeText, type Mode, type ModeId } from '@/lib/modes';
 
@@ -20,6 +21,8 @@ export default function HomeScreen() {
   const c = useColors();
   const { t, dir } = useI18n();
   const glasses = useGlasses();
+  // With saved helpers, one tap alerts them; otherwise it falls back to a code to share.
+  const hasHelpers = useContacts().some((p) => p.reachable);
 
   const h = new Date().getHours();
   const greeting = h < 12 ? t.greetMorning : h < 18 ? t.greetAfternoon : t.greetEvening;
@@ -44,7 +47,18 @@ export default function HomeScreen() {
         </Text>
 
         <LiveCard onPress={() => router.push('/live')} />
-        <HelperCard onPress={() => router.push('/helper')} />
+        <ActionCard
+          icon="person.wave.2.fill"
+          title={t.helperCardTitle}
+          subtitle={t.helperCardSubtitle}
+          onPress={() => router.push(hasHelpers ? { pathname: '/helper', params: { notify: 'all' } } : '/helper')}
+        />
+        <ActionCard
+          icon="location.north.circle.fill"
+          title={t.qiblaTitle}
+          subtitle={t.qiblaCardSubtitle}
+          onPress={() => router.push('/qibla')}
+        />
 
         <View style={styles.list}>
           {SUGGESTIONS.map((m) => (
@@ -95,26 +109,35 @@ function LiveCard({ onPress }: { onPress: () => void }) {
   );
 }
 
-function HelperCard({ onPress }: { onPress: () => void }) {
+function ActionCard({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: SFSymbol;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
   const c = useColors();
-  const { t } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t.helperCardTitle}
-      accessibilityHint={t.helperCardSubtitle}
+      accessibilityLabel={title}
+      accessibilityHint={subtitle}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
       }}
       style={({ pressed }) => [styles.live, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
       <View style={[styles.helperIcon, { backgroundColor: c.surface }]}>
-        <SymbolView name="person.wave.2.fill" size={24} tintColor={c.text} />
+        <SymbolView name={icon} size={24} tintColor={c.text} />
       </View>
       <View style={{ flex: 1, gap: Spacing.half }}>
-        <Text variant="heading">{t.helperCardTitle}</Text>
+        <Text variant="heading">{title}</Text>
         <Text variant="caption" tone="secondary">
-          {t.helperCardSubtitle}
+          {subtitle}
         </Text>
       </View>
     </Pressable>

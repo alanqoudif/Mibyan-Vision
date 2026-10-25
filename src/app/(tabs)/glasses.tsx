@@ -9,6 +9,7 @@ import { BottomTabInset, OrbColors, Radius, Spacing, useColors } from '@/constan
 import { FACES_ALLOWED, removeFace, useFaces } from '@/lib/faces';
 import { useGlasses, type GlassesStatus } from '@/lib/glasses';
 import { LANG_NAMES, useI18n } from '@/lib/i18n';
+import { removeMed, useMeds } from '@/lib/meds';
 import { ago, forget, forgetAll, useMemory } from '@/lib/memory';
 import { useSettings, type Settings } from '@/lib/settings';
 
@@ -29,6 +30,7 @@ export default function GlassesScreen() {
   const glasses = useGlasses();
   const memory = useMemory();
   const faces = useFaces();
+  const meds = useMeds();
   const status = t.glassesStatus[glasses.status];
 
   const speeds: { id: Settings['speed']; label: string }[] = [
@@ -41,6 +43,10 @@ export default function GlassesScreen() {
     { id: 'fast', label: t.modelFast, hint: t.modelFastHint },
   ];
   const langs = (['ar', 'en'] as const).map((id) => ({ id, label: LANG_NAMES[id] }));
+  const directionStyles: { id: Settings['directions']; label: string }[] = [
+    { id: 'clock', label: t.directionsClock },
+    { id: 'simple', label: t.directionsSimple },
+  ];
   const intervals = ([3, 5, 10] as const).map((n) => ({ id: String(n) as '3' | '5' | '10', label: t.seconds(n) }));
 
   return (
@@ -107,6 +113,15 @@ export default function GlassesScreen() {
         )}
       </View>
 
+      <Section title={t.siriTitle}>
+        <View style={[styles.pad, { flexDirection: 'row', alignItems: 'flex-start' }]}>
+          <SymbolView name="mic.circle.fill" size={28} tintColor={c.accent} />
+          <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
+            {t.siriHint}
+          </Text>
+        </View>
+      </Section>
+
       <Section title={t.sectionLanguage}>
         <View style={styles.pad}>
           <Segmented options={langs} value={settings.lang} onChange={(lang) => update({ lang })} />
@@ -152,12 +167,67 @@ export default function GlassesScreen() {
         />
         <Divider />
         <ToggleRow
+          icon="accessibility"
+          label={t.voiceOverSetting}
+          hint={t.voiceOverHint}
+          value={settings.voiceOver}
+          onChange={(voiceOver) => update({ voiceOver })}
+        />
+        <Divider />
+        <View style={styles.pad}>
+          <Text variant="heading">{t.directions}</Text>
+          <Segmented options={directionStyles} value={settings.directions} onChange={(directions) => update({ directions })} />
+          <Text variant="caption" tone="secondary">
+            {t.directionsHint}
+          </Text>
+        </View>
+        <Divider />
+        <ToggleRow
           icon="hand.raised"
           label={t.bargeIn}
           hint={`${t.bargeInHint}. ${t.voiceCommandsHint}`}
           value={settings.bargeIn}
           onChange={(bargeIn) => update({ bargeIn })}
         />
+      </Section>
+
+      <Section title={t.sectionMeds}>
+        <View style={styles.pad}>
+          <Text variant="caption" tone="secondary">
+            {t.medsHint}
+          </Text>
+        </View>
+        {meds.length === 0 ? (
+          <>
+            <Divider />
+            <View style={styles.pad}>
+              <Text tone="secondary">{t.medsEmpty}</Text>
+            </View>
+          </>
+        ) : (
+          meds.map((m) => (
+            <View key={m.id}>
+              <Divider />
+              <View style={styles.row}>
+                <View style={{ flex: 1 }} accessible accessibilityLabel={m.note ? `${m.name}: ${m.note}` : m.name}>
+                  <Text variant="heading">{m.name}</Text>
+                  {!!m.note && (
+                    <Text variant="caption" tone="secondary">
+                      {m.note}
+                    </Text>
+                  )}
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t.medRemove(m.name)}
+                  hitSlop={8}
+                  onPress={() => removeMed(m.id)}>
+                  <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
+                </Pressable>
+              </View>
+            </View>
+          ))
+        )}
       </Section>
 
       <Section title={t.sectionMemory}>
@@ -294,6 +364,22 @@ export default function GlassesScreen() {
           value={settings.haptics}
           onChange={(haptics) => update({ haptics })}
         />
+        <Divider />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t.contactsTitle}
+          accessibilityHint={t.contactsHint}
+          onPress={() => router.push('/contacts')}
+          style={styles.row}>
+          <SymbolView name="person.crop.circle.badge.plus" size={22} tintColor={c.text} />
+          <View style={{ flex: 1 }}>
+            <Text variant="heading">{t.contactsTitle}</Text>
+            <Text variant="caption" tone="secondary">
+              {t.contactsHint}
+            </Text>
+          </View>
+          <SymbolView name={dir === 'rtl' ? 'chevron.left' : 'chevron.right'} size={16} tintColor={c.textTertiary} />
+        </Pressable>
         <Divider />
         <Pressable
           accessibilityRole="button"

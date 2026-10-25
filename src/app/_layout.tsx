@@ -4,6 +4,7 @@ import { useColorScheme } from 'react-native';
 
 import { Palettes } from '@/constants/theme';
 import { SettingsProvider } from '@/lib/settings';
+import { useExternalRoutes } from '@/lib/shortcuts';
 
 export default function RootLayout() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -14,15 +15,23 @@ export default function RootLayout() {
     <SettingsProvider>
       <ThemeProvider value={{ ...base, colors: { ...base.colors, background: c.background, card: c.background } }}>
         <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+        <ExternalRoutes />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.background } }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="session" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="live" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="find" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="qibla" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="helper" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="help-view" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="contacts" options={{ presentation: 'modal' }} />
         </Stack>
       </ThemeProvider>
     </SettingsProvider>
   );
+}
+
+function ExternalRoutes() {
+  useExternalRoutes();
+  return null;
 }

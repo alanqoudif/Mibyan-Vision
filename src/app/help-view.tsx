@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,20 +7,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CircleButton } from '@/components/chrome';
 import { Text } from '@/components/text';
 import { Radius, Spacing, useColors } from '@/constants/theme';
-import { HelperEnded, joinSharing, sayToUser, viewSharing } from '@/lib/helper';
+import {
+  HelperEnded,
+  acceptInvite,
+  joinSharing,
+  leaveHelping,
+  listHelping,
+  sayToUser,
+  syncPushToken,
+  viewSharing,
+} from '@/lib/helper';
 import { useI18n } from '@/lib/i18n';
 
 const VIEW_EVERY_MS = 1000;
 
 /**
- * The helper's side of "someone see with me": enter the code the blind user shared, watch
- * their glasses view, and send short directions that are read aloud to them.
+ * The helper's side of "someone see with me": enter the code the blind user shared (or open
+ * their notification, which carries it as `code`), watch their glasses view, and send short
+ * directions that are read aloud to them. Also where a helper accepts an invite to be a
+ * trusted helper, so they get notified next time.
  */
 export default function HelpViewScreen() {
+  const { code: codeParam } = useLocalSearchParams<{ code?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
-  const { t, dir } = useI18n();
+  const { t, dir, lang } = useI18n();
 
   const [input, setInput] = useState('');
   const [code, setCode] = useState<string | null>(null);
@@ -31,12 +43,26 @@ export default function HelpViewScreen() {
   const [sent, setSent] = useState<string[]>([]);
   const alive = useRef(true);
 
-  useEffect(
-    () => () => {
-      alive.current = false;
-    },
-    [],
-  );
+  const [helping, setHelping] = useState<{ id: number; name: string }[]>([]);
+  const [invite, setInvite] = useState('');
+  const [myName, setMyName] = useState('');
+  const [theirName, setTheirName] = useState('');
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
+
+  const accept = async () => {
+    const digits = invite.replace(/\D/g, '');
+    if (digits.length !== 6) return setInviteMsg(t.acceptBadCode);
+    if (!myName.trim() || !theirName.trim()) return setInviteMsg(t.acceptNeedNames);
+    setInviteMsg(null);
+    try {
+      const { notifications } = await acceptInvite(digits, myName.trim(), theirName.trim(), lang);
+      setInviteMsg(notifications ? t.acceptDone(theirName.trim()) : t.acceptNoNotifications);
+      setInvite('');
+      setHelping(await listHelping());
+    } catch (e) {
+      setInviteMsg(e instanceof HelperEnded ? t.acceptNotFound : t.errNetwork);
+    }
+  };
 
   // Poll the latest frame while joined.
   useEffect(() => {
@@ -60,17 +86,21 @@ export default function HelpViewScreen() {
     };
   }, [code]);
 
-  const join = async () => {
+  /** Joins `digits`; state only changes once the request settles, so effects can call it. */
+  const connect = (digits: string) =>
+    joinSharing(digits).then(
+      () => {
+        setEnded(false);
+        setCode(digits);
+      },
+      (e) => setError(e instanceof HelperEnded ? t.helpViewNotFound : t.errNetwork),
+    );
+
+  const join = () => {
     const digits = input.replace(/\D/g, '');
     if (digits.length !== 8) return setError(t.helpViewBadCode);
     setError(null);
-    try {
-      await joinSharing(digits);
-      setEnded(false);
-      setCode(digits);
-    } catch (e) {
-      setError(e instanceof HelperEnded ? t.helpViewNotFound : t.errNetwork);
-    }
+    connect(digits);
   };
 
   const send = async (body: string) => {
@@ -84,6 +114,28 @@ export default function HelpViewScreen() {
       else setError(t.errNetwork);
     }
   };
+
+  // Opened from a helper notification: join straight away.
+  useEffect(() => {
+    if (codeParam) {
+      const digits = codeParam.replace(/\D/g, '');
+      joinSharing(digits).then(
+        () => setCode(digits),
+        (e) => setError(e instanceof HelperEnded ? t.helpViewNotFound : t.errNetwork),
+      );
+    }
+    listHelping()
+      .then((people) => {
+        setHelping(people);
+        if (people.length) syncPushToken();
+      })
+      .catch(() => {});
+    return () => {
+      alive.current = false;
+    };
+    // Runs once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const inputStyle = [
     styles.input,
@@ -101,7 +153,7 @@ export default function HelpViewScreen() {
       </View>
 
       {!code ? (
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Text tone="secondary">{t.helpViewIntro}</Text>
           <TextInput
             value={input}
@@ -123,7 +175,63 @@ export default function HelpViewScreen() {
               {t.helpViewJoin}
             </Text>
           </Pressable>
-        </View>
+
+          <Text variant="heading" accessibilityRole="header" style={{ marginTop: Spacing.four }}>
+            {t.acceptTitle}
+          </Text>
+          <Text tone="secondary">{t.acceptIntro}</Text>
+          <TextInput
+            value={invite}
+            onChangeText={setInvite}
+            placeholder="123456"
+            placeholderTextColor={c.textTertiary}
+            keyboardType="number-pad"
+            maxLength={7}
+            accessibilityLabel={t.acceptCode}
+            style={[...inputStyle, styles.codeInput]}
+          />
+          <TextInput
+            value={myName}
+            onChangeText={setMyName}
+            placeholder={t.acceptMyName}
+            placeholderTextColor={c.textTertiary}
+            accessibilityLabel={t.acceptMyName}
+            maxLength={60}
+            style={inputStyle}
+          />
+          <TextInput
+            value={theirName}
+            onChangeText={setTheirName}
+            placeholder={t.acceptTheirName}
+            placeholderTextColor={c.textTertiary}
+            accessibilityLabel={t.acceptTheirName}
+            maxLength={60}
+            style={inputStyle}
+            onSubmitEditing={accept}
+          />
+          {!!inviteMsg && <Text tone="secondary">{inviteMsg}</Text>}
+          <Pressable
+            accessibilityRole="button"
+            onPress={accept}
+            style={({ pressed }) => [styles.pill, { backgroundColor: c.surface, opacity: pressed ? 0.75 : 1 }]}>
+            <Text variant="heading">{t.acceptButton}</Text>
+          </Pressable>
+
+          {helping.map((p) => (
+            <View key={p.id} style={styles.row}>
+              <Text style={{ flex: 1 }}>{t.helpingName(p.name)}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.helpingLeave(p.name)}
+                hitSlop={8}
+                onPress={() => leaveHelping(p.id).then(() => setHelping((h) => h.filter((x) => x.id !== p.id)), () => {})}>
+                <Text variant="caption" style={{ color: c.stopText }}>
+                  {t.helpingLeaveShort}
+                </Text>
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={[styles.frame, { backgroundColor: c.surface }]}>

@@ -1,13 +1,19 @@
-import { setAudioModeAsync } from 'expo-audio';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
-import * as Speech from 'expo-speech';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,21 +21,37 @@ import { CircleButton } from '@/components/chrome';
 import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
 import { Radius, Spacing, useColors } from '@/constants/theme';
-import { SILENT, URGENT, streamAssist, type Turn } from '@/lib/assist';
+import { SILENT, URGENT, parseTags, splitAnswer, streamAssist, visibleText, type Turn } from '@/lib/assist';
+import { matchCommand } from '@/lib/commands';
 import * as Earcons from '@/lib/earcons';
 import { captureFromGlasses, stopGlasses, takeGlassesNotice } from '@/lib/glasses';
 import { useI18n } from '@/lib/i18n';
+import { prepareMic } from '@/lib/listen';
+import { memoryNotes, recordTags } from '@/lib/memory';
 import { SPEECH_RATE, useSettings } from '@/lib/settings';
+import * as Voice from '@/lib/voice';
 
 type Note = { id: number; text: string; urgent: boolean; at: Date };
+
+// Talking to live mode: louder than street noise, and a pause ends the question.
+const LOUD_DB = -32;
+const SILENCE_MS = 1300;
+const MAX_QUESTION_MS = 12000;
+/** Restart an idle recording now and then so it never grows long. */
+const IDLE_RESTART_MS = 20000;
+const KEEP_AWAKE = 'live';
 
 /**
  * Live mode: grabs a frame every few seconds and only speaks when the model
  * reports something new or important (it answers <silent> otherwise).
  * Hazards come back prefixed with "!" and get a strong haptic + interrupt.
+ *
+ * Made for the phone in a pocket: with the glasses it keeps running with the screen locked.
+ * The mic stays open the whole time (which is also what keeps iOS from suspending the app),
+ * so the user can just ask a question out loud; it's answered with the current frame.
+ * The screen only has to stay on when the phone camera is the one looking.
  */
 export default function LiveScreen() {
-  useKeepAwake();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
@@ -39,6 +61,9 @@ export default function LiveScreen() {
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const cameraReady = useRef(false);
+
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const recState = useAudioRecorderState(recorder, 120);
 
   const [paused, setPaused] = useState(false);
   const [orb, setOrb] = useState<OrbState>('idle');
@@ -50,19 +75,27 @@ export default function LiveScreen() {
   const pausedRef = useRef(false);
   const busy = useRef(false);
   const speaking = useRef(false);
+  const asking = useRef(false);
+  const micOpen = useRef(false);
+  const vad = useRef({ start: 0, lastLoud: 0, heard: false });
   const context = useRef<Turn[]>([]);
   const nextId = useRef(1);
   const failedRef = useRef(false);
+  const toldNoCamera = useRef(false);
 
   // ---------- frames ----------
   const captureFrame = useCallback(async (): Promise<string | undefined> => {
     try {
       let uri = await captureFromGlasses();
       setFromGlasses(!!uri);
-      if (!uri && cameraRef.current && cameraReady.current) {
+      // The phone camera only works on screen, so it needs the screen kept on.
+      if (uri) deactivateKeepAwake(KEEP_AWAKE).catch(() => {});
+      else activateKeepAwakeAsync(KEEP_AWAKE).catch(() => {});
+      if (!uri && AppState.currentState === 'active' && cameraRef.current && cameraReady.current) {
         uri = (await cameraRef.current.takePictureAsync({ quality: 0.5, shutterSound: false })).uri;
       }
       if (!uri) return undefined;
+      toldNoCamera.current = false;
       const ref = await ImageManipulator.manipulate(uri).resize({ width: 640 }).renderAsync();
       return (await ref.saveAsync({ base64: true, compress: 0.55, format: SaveFormat.JPEG })).base64;
     } catch (e) {
@@ -71,38 +104,69 @@ export default function LiveScreen() {
     }
   }, []);
 
+  // ---------- mic ----------
+  /** (Re)starts the always-on recording, so a question never includes old audio. */
+  const openMic = useCallback(async () => {
+    if (!alive.current) return;
+    try {
+      if (recorder.isRecording) await recorder.stop().catch(() => {});
+      await prepareMic(recorder, { shouldPlayInBackground: true, allowsBackgroundRecording: true });
+      recorder.record();
+      vad.current = { start: Date.now(), lastLoud: 0, heard: false };
+      micOpen.current = true;
+    } catch (e) {
+      micOpen.current = false;
+      console.warn('live mic failed', e);
+    }
+  }, [recorder]);
+
   const say = useCallback(
     (text: string, interrupt = false) => {
-      if (interrupt) Speech.stop();
       speaking.current = true;
       setOrb('speaking');
       const done = () => {
         speaking.current = false;
-        if (alive.current) setOrb(pausedRef.current ? 'idle' : 'listening');
+        if (!alive.current) return;
+        setOrb(pausedRef.current ? 'idle' : 'listening');
+        // Drop what the mic heard of our own voice.
+        if (!asking.current) openMic();
       };
-      Speech.speak(text, { language: speechLang, rate: SPEECH_RATE[settings.speed], onDone: done, onStopped: done, onError: done });
+      Voice.speakNow(text, { language: speechLang, rate: SPEECH_RATE[settings.speed], onDone: done, interrupt });
     },
-    [settings.speed, speechLang],
+    [openMic, settings.speed, speechLang],
   );
 
   // ---------- one look ----------
   const tick = useCallback(async () => {
-    if (!alive.current || pausedRef.current || busy.current || speaking.current) return;
+    if (!alive.current || pausedRef.current || busy.current || speaking.current || asking.current) return;
     busy.current = true;
     setOrb('thinking');
     try {
       const image = await captureFrame();
       const notice = takeGlassesNotice();
       if (notice && alive.current) say(t.glassesNotice[notice], true);
+      if (!image && AppState.currentState !== 'active' && !toldNoCamera.current) {
+        // Locked phone and no glasses: nothing can look, so say so once instead of going quiet.
+        toldNoCamera.current = true;
+        say(t.liveNeedsGlasses, true);
+      }
       if (!image || !alive.current || pausedRef.current) return;
       const raw = await streamAssist(
-        { mode: 'live', image, history: context.current.slice(-6), model: settings.model, detail: false, lang },
+        {
+          mode: 'live',
+          image,
+          history: context.current.slice(-6),
+          model: settings.model,
+          detail: false,
+          lang,
+          directions: settings.directions,
+        },
         () => {},
       );
       setFailed(false);
       failedRef.current = false;
       const text = raw.trim();
-      if (!alive.current || pausedRef.current || !text || text.includes(SILENT)) return;
+      if (!alive.current || pausedRef.current || asking.current || !text || text.includes(SILENT)) return;
 
       const urgent = text.startsWith(URGENT);
       const clean = text.replace(/^!\s*/, '');
@@ -122,19 +186,102 @@ export default function LiveScreen() {
       busy.current = false;
       if (alive.current && !speaking.current) setOrb(pausedRef.current ? 'idle' : 'listening');
     }
-  }, [captureFrame, lang, say, settings.haptics, settings.model, t]);
+  }, [captureFrame, lang, say, settings.directions, settings.haptics, settings.model, t]);
+
+  // ---------- a spoken question ----------
+  const ask = useCallback(async () => {
+    if (asking.current || !alive.current) return;
+    asking.current = true;
+    micOpen.current = false;
+    Earcons.play('send');
+    if (settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setOrb('thinking');
+    Earcons.startThinking();
+    try {
+      await recorder.stop().catch(() => {});
+      const uri = recorder.uri;
+      if (!uri) return;
+      // The glasses take one photo at a time; let a look in progress finish.
+      for (let i = 0; i < 50 && busy.current; i++) await sleep(100);
+      const [audio, image] = await Promise.all([new File(uri).base64(), captureFrame()]);
+      let raw = '';
+      let stopped = false;
+      raw = await streamAssist(
+        {
+          mode: 'ask',
+          audio,
+          image,
+          history: context.current.slice(-8),
+          model: settings.model,
+          detail: false,
+          lang,
+          memory: memoryNotes(lang),
+          directions: settings.directions,
+        },
+        (delta) => {
+          raw += delta;
+          const s = splitAnswer(raw);
+          if (!stopped && s.question && !s.pending && matchCommand(s.question) === 'stop') stopped = true;
+        },
+      );
+      Earcons.stopThinking();
+      if (!alive.current || stopped) {
+        Voice.stop();
+        return;
+      }
+      const s = splitAnswer(raw);
+      const answer = visibleText(s.answer).trim();
+      recordTags(parseTags(s.answer), image);
+      if (!answer) return;
+      context.current.push({ role: 'user', content: s.question ?? '' }, { role: 'assistant', content: answer });
+      setNotes((n) => [{ id: nextId.current++, text: answer, urgent: false, at: new Date() }, ...n].slice(0, 30));
+      say(answer, true);
+    } catch (e) {
+      console.warn('live question failed', e);
+      Earcons.play('error');
+      say(t.errNetworkSpoken, true);
+    } finally {
+      Earcons.stopThinking();
+      asking.current = false;
+      if (alive.current && !speaking.current) {
+        setOrb(pausedRef.current ? 'idle' : 'listening');
+        openMic();
+      }
+    }
+  }, [captureFrame, lang, openMic, recorder, say, settings.directions, settings.haptics, settings.model, t]);
+
+  // Voice activity on the always-on mic: speech then a pause is a question.
+  useEffect(() => {
+    if (!micOpen.current || asking.current || speaking.current) return;
+    const now = Date.now();
+    const v = vad.current;
+    if ((recState.metering ?? -160) > LOUD_DB) {
+      if (!v.heard) Earcons.play('listen');
+      v.heard = true;
+      v.lastLoud = now;
+    }
+    if (v.heard && (now - v.lastLoud > SILENCE_MS || now - v.start > MAX_QUESTION_MS)) ask();
+    else if (!v.heard && now - v.start > IDLE_RESTART_MS) openMic();
+  }, [recState.metering, recState.durationMillis, ask, openMic]);
 
   // ---------- lifecycle ----------
   useEffect(() => {
     alive.current = true;
     (async () => {
       if (!camPerm?.granted) await requestCamPerm();
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      const mic = await requestRecordingPermissionsAsync();
+      if (mic.granted) await openMic();
+      else await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
       say(t.liveStarted);
     })();
     return () => {
       alive.current = false;
-      Speech.stop();
+      micOpen.current = false;
+      Voice.stop();
+      Earcons.stopThinking();
+      recorder.stop().catch(() => {});
+      setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false, allowsBackgroundRecording: false }).catch(() => {});
+      deactivateKeepAwake(KEEP_AWAKE).catch(() => {});
       stopGlasses();
     };
     // Runs once; later values are read through refs.
@@ -163,9 +310,8 @@ export default function LiveScreen() {
     setPaused(next);
     if (settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (next) {
-      Speech.stop();
       setOrb('idle');
-      say(t.liveStopped);
+      say(t.liveStopped, true);
     } else {
       setOrb('listening');
       tick();
@@ -174,7 +320,7 @@ export default function LiveScreen() {
 
   const close = () => {
     alive.current = false;
-    Speech.stop();
+    Voice.stop();
     router.back();
   };
 
@@ -233,6 +379,8 @@ export default function LiveScreen() {
         ) : (
           <Text variant="body" tone="secondary">
             {failed ? t.errNetwork : paused ? t.livePaused : t.liveEmpty}
+            {'\n\n'}
+            {t.livePocketHint}
           </Text>
         )}
         {notes.slice(1).map((n) => (
@@ -285,6 +433,8 @@ function LiveChip({ paused, label }: { paused: boolean; label: string }) {
     </View>
   );
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

@@ -56,7 +56,9 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "مبيان فيجن يحتاج المايك عشان تكلمه."
+          "microphonePermission": "مبيان فيجن يحتاج المايك عشان تكلمه.",
+          "enableBackgroundRecording": true,
+          "enableBackgroundPlayback": true
         }
       ],
       [
@@ -71,6 +73,25 @@
         "./plugins/with-meta-wearables",
         {
           "urlScheme": "mata"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "مبيان فيجن يستخدم موقعك عشان يقولك وين أنت ويحدد اتجاه القبلة."
+        }
+      ],
+      [
+        "expo-notifications",
+        {}
+      ],
+      [
+        "./plugins/with-shortcuts",
+        {
+          "alternativeNames": [
+            "مبيان",
+            "Mubayan"
+          ]
         }
       ]
     ],

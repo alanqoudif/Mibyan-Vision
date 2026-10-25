@@ -4,7 +4,6 @@ import * as Haptics from 'expo-haptics';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Speech from 'expo-speech';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -21,6 +20,7 @@ import { useI18n } from '@/lib/i18n';
 import { useListen } from '@/lib/listen';
 import { memoryNotes } from '@/lib/memory';
 import { SPEECH_RATE, useSettings } from '@/lib/settings';
+import * as Voice from '@/lib/voice';
 
 type Pos = 'left' | 'right' | 'ahead' | 'up' | 'down' | 'none';
 type Dist = 'reach' | 'near' | 'mid' | 'far';
@@ -82,16 +82,14 @@ export default function FindScreen() {
   const rate = SPEECH_RATE[settings.speed];
   const say = useCallback(
     (text: string, interrupt = true) => {
-      if (interrupt) Speech.stop();
-      Speech.speak(text, { language: speechLang, rate });
+      Voice.speakNow(text, { language: speechLang, rate, interrupt });
     },
     [rate, speechLang],
   );
   const sayAndWait = useCallback(
     (text: string) =>
       new Promise<void>((resolve) => {
-        Speech.stop();
-        Speech.speak(text, { language: speechLang, rate, onDone: () => resolve(), onStopped: () => resolve(), onError: () => resolve() });
+        Voice.speakNow(text, { language: speechLang, rate, onDone: resolve, interrupt: true });
       }),
     [rate, speechLang],
   );
@@ -210,7 +208,7 @@ export default function FindScreen() {
 
   /** Asks what to look for (unless it came with the screen), then starts searching. */
   const ask = useCallback(async () => {
-    Speech.stop();
+    Voice.stop();
     setPhase('asking');
     setPos('none');
     setHint('');
@@ -249,7 +247,7 @@ export default function FindScreen() {
     return () => {
       alive.current = false;
       cancel();
-      Speech.stop();
+      Voice.stop();
       stopGlasses();
     };
     // Runs once; later values are read through refs.
@@ -281,7 +279,7 @@ export default function FindScreen() {
 
   const close = () => {
     alive.current = false;
-    Speech.stop();
+    Voice.stop();
     router.back();
   };
 

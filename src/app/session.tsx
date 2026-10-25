@@ -21,14 +21,19 @@ import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
 import { Radius, Spacing, useColors } from '@/constants/theme';
 import { parseTags, splitAnswer, streamAssist, visibleText, type AssistRequest, type Turn } from '@/lib/assist';
-import { matchCommand } from '@/lib/commands';
+import { matchCommand, matchRoute } from '@/lib/commands';
 import * as Earcons from '@/lib/earcons';
 import { FACES_ALLOWED, addFace, faceRefs } from '@/lib/faces';
 import { checkFrame } from '@/lib/framing';
+import { contactIn } from '@/lib/helper';
 import { captureFromGlasses, stopGlasses, takeGlassesNotice } from '@/lib/glasses';
 import { useI18n } from '@/lib/i18n';
+import { prepareMic } from '@/lib/listen';
+import { addMed, medRefs } from '@/lib/meds';
 import { memoryNotes, recordTags } from '@/lib/memory';
 import { getMode, modeText } from '@/lib/modes';
+import { READS_TEXT, readTextOffline } from '@/lib/offline';
+import { describePlace } from '@/lib/place';
 import { SPEECH_RATE, useSettings } from '@/lib/settings';
 
 type Phase = 'preparing' | 'framing' | 'listening' | 'thinking' | 'speaking' | 'idle' | 'error';
@@ -201,8 +206,7 @@ export default function SessionScreen() {
     try {
       const perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) return;
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      await recorder.prepareToRecordAsync();
+      await prepareMic(recorder);
       recorder.record();
       vad.current = { start: Date.now(), lastLoud: 0, heard: false, loudSince: 0 };
       barging.current = true;
@@ -288,6 +292,11 @@ export default function SessionScreen() {
       if (notice) Voice.speak(t.glassesNotice[notice], { language: speechLang, rate: SPEECH_RATE[settings.speed] });
 
       const facesOn = FACES_ALLOWED && settings.faces && mode.id === 'people';
+      const [meds, place] = await Promise.all([
+        mode.id === 'meds' ? medRefs() : undefined,
+        mode.id === 'where' ? describePlace(lang) : undefined,
+      ]);
+      if (ctrl.signal.aborted) return;
       let raw = '';
       let commandSeen = false;
       try {
@@ -302,6 +311,9 @@ export default function SessionScreen() {
             memory: memoryNotes(lang),
             faces: facesOn ? await faceRefs() : undefined,
             faces_enabled: facesOn,
+            meds,
+            place,
+            directions: settings.directions,
           },
           (delta) => {
             if (ctrl.signal.aborted) return;
@@ -319,6 +331,15 @@ export default function SessionScreen() {
                 return;
               }
               if (cmd) detailOverride.current = cmd === 'detail';
+              // "Where's the qibla?", "call mom to see with me": open that screen instead.
+              const route = matchRoute(s.question, (text) => contactIn(text)?.id);
+              if (route && !(route.pathname === '/session' && mode.id === 'where')) {
+                silence();
+                stopBarge();
+                alive.current = false;
+                router.replace(route);
+                return;
+              }
             }
             const shown = visibleText(s.answer);
             setAnswer(shown);
@@ -330,6 +351,18 @@ export default function SessionScreen() {
         if (!alive.current || ctrl.signal.aborted) return;
         console.warn(e);
         stopBarge();
+        // No internet: text can still be read on the phone itself.
+        const offline = READS_TEXT.has(mode.id) && req.image ? await readTextOffline(req.image, lang) : null;
+        if (!alive.current) return;
+        if (offline) {
+          const spokenText = `${t.offlineReading} ${offline}`;
+          setAnswer(spokenText);
+          setPhase('speaking');
+          spoken.current = 0;
+          streamDone.current = true;
+          feedSpeech(spokenText, true);
+          return;
+        }
         setError(t.errNetwork);
         setPhase('error');
         Earcons.play('error');
@@ -348,6 +381,7 @@ export default function SessionScreen() {
       const tags = parseTags(s.answer);
       recordTags(tags, req.image);
       if (facesOn && req.image) tags.faces.forEach((name) => addFace(name, req.image!));
+      if (req.image) tags.meds.forEach((m) => addMed(m.name, m.note, req.image!));
 
       turns.current.push(
         { role: 'user', content: s.question ?? req.text ?? prompt },
@@ -355,7 +389,7 @@ export default function SessionScreen() {
       );
       if (outstanding.current === 0) onAnswerFinished();
     },
-    [feedSpeech, mode.id, prompt, onAnswerFinished, settings, lang, t, speechLang, silence, startBarge, stopBarge],
+    [feedSpeech, mode.id, prompt, onAnswerFinished, settings, lang, t, speechLang, silence, startBarge, stopBarge, router],
   );
 
   // ---------- microphone ----------
@@ -373,8 +407,7 @@ export default function SessionScreen() {
           return;
         }
         if (recorder.isRecording) await recorder.stop().catch(() => {});
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        await recorder.prepareToRecordAsync();
+        await prepareMic(recorder);
         recorder.record();
         vad.current = { start: Date.now(), lastLoud: Date.now(), heard: false, loudSince: 0 };
         setQuestion(null);
