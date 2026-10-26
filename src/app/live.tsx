@@ -5,7 +5,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { type CameraView, useCameraPermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
@@ -17,6 +17,7 @@ import { AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CameraPreview } from '@/components/camera-preview';
 import { CircleButton } from '@/components/chrome';
 import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
@@ -24,7 +25,7 @@ import { Radius, Spacing, useColors } from '@/constants/theme';
 import { SILENT, URGENT, parseTags, splitAnswer, streamAssist, visibleText, type Turn } from '@/lib/assist';
 import { matchCommand } from '@/lib/commands';
 import * as Earcons from '@/lib/earcons';
-import { captureFromGlasses, stopGlasses, takeGlassesNotice } from '@/lib/glasses';
+import { captureFromGlasses, stopGlasses, takeGlassesNotice, useCameraSource } from '@/lib/glasses';
 import { useI18n } from '@/lib/i18n';
 import { prepareMic } from '@/lib/listen';
 import { memoryNotes, recordTags } from '@/lib/memory';
@@ -68,7 +69,7 @@ export default function LiveScreen() {
   const [paused, setPaused] = useState(false);
   const [orb, setOrb] = useState<OrbState>('idle');
   const [notes, setNotes] = useState<Note[]>([]);
-  const [fromGlasses, setFromGlasses] = useState(false);
+  const fromGlasses = useCameraSource().glasses;
   const [failed, setFailed] = useState(false);
 
   const alive = useRef(true);
@@ -87,7 +88,6 @@ export default function LiveScreen() {
   const captureFrame = useCallback(async (): Promise<string | undefined> => {
     try {
       let uri = await captureFromGlasses();
-      setFromGlasses(!!uri);
       // The phone camera only works on screen, so it needs the screen kept on.
       if (uri) deactivateKeepAwake(KEEP_AWAKE).catch(() => {});
       else activateKeepAwakeAsync(KEEP_AWAKE).catch(() => {});
@@ -337,19 +337,13 @@ export default function LiveScreen() {
 
       {/* camera */}
       <View style={[styles.preview, { backgroundColor: c.surface }]}>
-        {camPerm?.granted ? (
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            animateShutter={false}
-            onCameraReady={() => {
-              cameraReady.current = true;
-            }}
-          />
-        ) : (
-          <SymbolView name="video.slash" size={40} tintColor={c.textTertiary} />
-        )}
+        <CameraPreview
+          cameraRef={cameraRef}
+          readyRef={cameraReady}
+          granted={!!camPerm?.granted}
+          iconSize={40}
+          iconColor={c.textTertiary}
+        />
         <View style={styles.previewOverlay} pointerEvents="none">
           <View style={styles.sourceChip}>
             <SymbolView name={fromGlasses ? 'eyeglasses' : 'iphone.rear.camera'} size={14} tintColor="#FFFFFF" />

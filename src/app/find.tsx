@@ -1,5 +1,5 @@
 import { setAudioModeAsync } from 'expo-audio';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { type CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CameraPreview } from '@/components/camera-preview';
 import { CircleButton } from '@/components/chrome';
 import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
@@ -300,19 +301,13 @@ export default function FindScreen() {
           {target ? t.findLooking(target) : t.findTitle}
         </Text>
         <View style={[styles.cam, { backgroundColor: c.surface }]} accessible accessibilityLabel={t.cameraOn}>
-          {camPerm?.granted ? (
-            <CameraView
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-              facing="back"
-              animateShutter={false}
-              onCameraReady={() => {
-                cameraReady.current = true;
-              }}
-            />
-          ) : (
-            <SymbolView name="video.slash" size={20} tintColor={c.textSecondary} />
-          )}
+          <CameraPreview
+            cameraRef={cameraRef}
+            readyRef={cameraReady}
+            granted={!!camPerm?.granted}
+            iconSize={20}
+            iconColor={c.textSecondary}
+          />
         </View>
       </View>
 

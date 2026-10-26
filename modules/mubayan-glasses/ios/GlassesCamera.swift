@@ -34,9 +34,16 @@ final class GlassesCamera {
   private var streamState: StreamState = .stopped
   private var lastError: String?
   private var photoWaiter: CheckedContinuation<Data, Error>?
-  private let sessionTokens = ListenerTokenBag()
-  private let streamTokens = ListenerTokenBag()
+  private var photoTimeout: Task<Void, Never>?
+  // `ListenerTokenBag.clear()` cancels asynchronously, so a cleared bag can still cancel
+  // listeners stored right after it. Each session and stream gets a fresh bag instead.
+  private var sessionTokens = ListenerTokenBag()
+  private var streamTokens = ListenerTokenBag()
   private var registrationTask: Task<Void, Never>?
+  // Created once so it is already tracking the glasses when the first capture comes in.
+  private var deviceSelector: AutoDeviceSelector?
+  private var activeDevice: DeviceIdentifier?
+  private var deviceTask: Task<Void, Never>?
 
   func configure() {
     guard !configured else { return }
@@ -46,6 +53,13 @@ final class GlassesCamera {
       NSLog("[MubayanGlasses] configure failed: \(error)")
     }
     configured = true
+    let selector = AutoDeviceSelector(wearables: Wearables.shared)
+    deviceSelector = selector
+    deviceTask = Task { [weak self] in
+      for await device in selector.activeDeviceStream() {
+        self?.activeDevice = device
+      }
+    }
     registrationTask = Task { [weak self] in
       for await state in Wearables.shared.registrationStateStream() {
         self?.onRegistrationChange?(Self.name(state))
@@ -87,15 +101,15 @@ final class GlassesCamera {
     try await ensureStreaming()
 
     let data: Data = try await withCheckedThrowingContinuation { continuation in
-      photoWaiter?.resume(throwing: CaptureFailedException("superseded"))
+      failPhoto("superseded")
       photoWaiter = continuation
       guard camera?.stream.capturePhoto(format: .jpeg) == true else {
-        photoWaiter = nil
-        continuation.resume(throwing: CaptureFailedException("the glasses didn't start the capture"))
+        failPhoto("the glasses didn't start the capture")
         return
       }
-      Task { [weak self] in
+      photoTimeout = Task { [weak self] in
         try? await Task.sleep(for: .seconds(12))
+        guard !Task.isCancelled else { return }
         self?.failPhoto("timed out")
       }
     }
@@ -110,7 +124,7 @@ final class GlassesCamera {
     camera?.stop()
     session?.stop()
     clearStream()
-    sessionTokens.clear()
+    resetSessionTokens()
     session = nil
     sessionState = .idle
   }
@@ -119,10 +133,12 @@ final class GlassesCamera {
 
   private func ensureStreaming() async throws {
     if session == nil || sessionState == .stopped {
-      sessionTokens.clear()
+      resetSessionTokens()
       clearStream()
       lastError = nil
-      let newSession = try Wearables.shared.createSession(deviceSelector: AutoDeviceSelector(wearables: Wearables.shared))
+      guard let selector = deviceSelector else { throw GlassesUnavailableException("the SDK isn't configured") }
+      try await waitForDevice(selector)
+      let newSession = try Wearables.shared.createSession(deviceSelector: selector)
       session = newSession
       newSession.statePublisher.listen { [weak self] state in
         Task { @MainActor in self?.sessionStateChanged(state) }
@@ -162,6 +178,18 @@ final class GlassesCamera {
     try await waitUntil("starting the camera", failed: { $0.camera == nil }) { $0.streamState == .streaming }
   }
 
+  /// Fails fast when no glasses are connected (off, folded, or out of range), so callers
+  /// fall back to the phone camera instead of waiting out the session timeout.
+  private func waitForDevice(_ selector: AutoDeviceSelector) async throws {
+    let deadline = Date().addingTimeInterval(5)
+    while (activeDevice ?? selector.activeDevice) == nil {
+      if Date() > deadline {
+        throw GlassesUnavailableException("no glasses connected; check they're on, unfolded and paired in Meta AI")
+      }
+      try await Task.sleep(for: .milliseconds(100))
+    }
+  }
+
   private func waitUntil(
     _ step: String,
     failed: (GlassesCamera) -> Bool,
@@ -186,7 +214,7 @@ final class GlassesCamera {
     sessionState = state
     if state == .stopped {
       clearStream()
-      sessionTokens.clear()
+      resetSessionTokens()
       session = nil
     }
   }
@@ -196,8 +224,14 @@ final class GlassesCamera {
     if state == .stopped { clearStream() }
   }
 
+  private func resetSessionTokens() {
+    sessionTokens.clear()
+    sessionTokens = ListenerTokenBag()
+  }
+
   private func clearStream() {
     streamTokens.clear()
+    streamTokens = ListenerTokenBag()
     camera?.stop()
     camera = nil
     streamState = .stopped
@@ -205,11 +239,15 @@ final class GlassesCamera {
   }
 
   private func receivePhoto(_ data: Data) {
+    photoTimeout?.cancel()
+    photoTimeout = nil
     photoWaiter?.resume(returning: data)
     photoWaiter = nil
   }
 
   private func failPhoto(_ message: String) {
+    photoTimeout?.cancel()
+    photoTimeout = nil
     photoWaiter?.resume(throwing: CaptureFailedException(message))
     photoWaiter = nil
   }

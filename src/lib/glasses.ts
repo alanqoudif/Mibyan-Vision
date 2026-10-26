@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 
 import * as Earcons from '@/lib/earcons';
@@ -97,21 +97,62 @@ export function takeGlassesNotice(): GlassesNotice | null {
   return n;
 }
 
+/**
+ * Where photos come from right now, and the latest glasses photo to show as the preview.
+ * Screens keep the phone camera closed while the glasses are the source.
+ */
+export type CameraSource = { glasses: boolean; frame?: string };
+
+let source: CameraSource = { glasses: false };
+let sourceVersion = 0;
+const sourceListeners = new Set<() => void>();
+
+function setSource(next: CameraSource) {
+  source = next;
+  sourceVersion++;
+  sourceListeners.forEach((l) => l());
+}
+
+function subscribeSource(listener: () => void) {
+  sourceListeners.add(listener);
+  return () => sourceListeners.delete(listener);
+}
+
+export function useCameraSource(): CameraSource {
+  useEffect(() => {
+    if (!Glasses) return;
+    // Before the first capture, start on the glasses if they're set up.
+    const version = sourceVersion;
+    Glasses.getRegistrationState()
+      .then(resolveStatus)
+      .then((status) => {
+        if (sourceVersion === version) setSource({ glasses: status === 'ready', frame: source.frame });
+      })
+      .catch(() => {});
+  }, []);
+  return useSyncExternalStore(subscribeSource, () => source);
+}
+
 /** A `file://` JPEG from the glasses, or `undefined` if they aren't set up or reachable. */
 export async function captureFromGlasses(): Promise<string | undefined> {
   if (!Glasses) return undefined;
   try {
-    if ((await Glasses.getRegistrationState()) !== 'registered') return undefined;
+    if ((await Glasses.getRegistrationState()) !== 'registered') {
+      setSource({ glasses: false });
+      return undefined;
+    }
   } catch {
     return undefined;
   }
   try {
     const uri = await Glasses.capturePhoto();
     notice('back');
+    setSource({ glasses: true, frame: uri });
     return uri;
   } catch (e) {
     console.warn('glasses capture failed, using the phone camera', e);
     notice(message(e).includes('paused') ? 'paused' : 'lost');
+    setSource({ glasses: false });
     return undefined;
   }
 }
