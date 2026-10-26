@@ -1,9 +1,10 @@
 // Native setup for the Meta Wearables Device Access Toolkit (modules/mubayan-glasses).
-// Info.plist keys follow Meta's getting-started guide; the Podfile and embed-phase tweaks
-// are needed because the SDK ships as SPM binary frameworks pulled in through a pod.
+// Info.plist keys follow Meta's getting-started guide; the embed phase is needed because the
+// SDK ships as SPM binary frameworks pulled in through a pod. Don't turn on CocoaPods'
+// deterministic UUIDs: same-named files (each library's codegen Props.cpp) get one UUID and
+// only one is compiled, which fails the link.
 const {
   withInfoPlist,
-  withPodfile,
   withXcodeProject,
 } = require('expo/config-plugins');
 
@@ -43,19 +44,6 @@ module.exports = function withMetaWearables(config, { urlScheme, metaAppId = '0'
     addUnique(plist, 'NSBonjourServices', '_bonjour._tcp');
     plist.NSLocalNetworkUsageDescription ??= 'مبيان فيجن يتصل بالنظارة عبر الواي فاي عشان تنتقل الصور بسرعة.';
     plist.NSBluetoothAlwaysUsageDescription ??= 'مبيان فيجن يتصل بالنظارة عبر البلوتوث.';
-    return cfg;
-  });
-
-  // Adding SPM products to a pod can make CocoaPods reuse a project UUID; deterministic
-  // UUIDs avoid the resulting "duplicate object" corruption.
-  config = withPodfile(config, (cfg) => {
-    const line = "install! 'cocoapods', installation_method.last.merge(:deterministic_uuids => true)";
-    if (!cfg.modResults.contents.includes(line)) {
-      cfg.modResults.contents = cfg.modResults.contents.replace(
-        /^prepare_react_native_project![ \t]*$/m,
-        `prepare_react_native_project!\n${line}`
-      );
-    }
     return cfg;
   });
 
