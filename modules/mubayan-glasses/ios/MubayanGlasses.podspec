@@ -29,4 +29,6 @@ Pod::Spec.new do |s|
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.source_files = '**/*.swift'
+  # Apple's Depth Anything V2 Small (Core ML, 8-bit palettized), precompiled, for ObstacleSensor.
+  s.resources = 'Models/*.mlmodelc'
 end

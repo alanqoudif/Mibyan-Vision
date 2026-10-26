@@ -5,6 +5,8 @@ import { Image, StyleSheet } from 'react-native';
 
 import { useCameraSource } from '@/lib/glasses';
 
+import { GlassesPreview } from '../../modules/mubayan-glasses';
+
 type Props = {
   cameraRef: RefObject<CameraView | null>;
   /** Set while the phone camera is mounted and ready to take a picture. */
@@ -16,13 +18,14 @@ type Props = {
 };
 
 /**
- * The camera tile on capture screens: the latest glasses photo while the glasses are the
+ * The camera tile on capture screens: the glasses' live video while the glasses are the
  * source, otherwise the phone camera (which only opens then, as the fallback).
  */
 export function CameraPreview({ cameraRef, readyRef, granted, iconSize, iconColor }: Props) {
   const source = useCameraSource();
 
   if (source.glasses) {
+    if (GlassesPreview) return <GlassesPreview style={StyleSheet.absoluteFill} />;
     return source.frame ? (
       <Image source={{ uri: source.frame }} style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors />
     ) : (

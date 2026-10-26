@@ -66,6 +66,26 @@ function stopAnnouncements() {
   if (viaScreenReader()) AccessibilityInfo.announceForAccessibility(' ');
 }
 
+// ---------- device voice ----------
+// iOS ships a basic voice per language; an Enhanced one sounds far more natural and starts just
+// as fast, so use it whenever the user has downloaded one.
+
+let bestVoices: Record<string, string> = {};
+Speech.getAvailableVoicesAsync()
+  .then((voices) => {
+    for (const v of voices) {
+      const lang = v.language.slice(0, 2);
+      if (v.quality === Speech.VoiceQuality.Enhanced || !bestVoices[lang]) bestVoices[lang] = v.identifier;
+    }
+  })
+  .catch(() => {});
+
+function deviceSpeak(text: string, opts: SpeakOptions, done: () => void) {
+  const language = opts.language ?? 'ar-SA';
+  const voice = bestVoices[language.slice(0, 2)];
+  Speech.speak(text, { language, voice, rate: opts.rate, onDone: done, onStopped: done, onError: done });
+}
+
 /**
  * The device voice, which starts instantly: for short live-mode and guidance lines.
  * `interrupt` cuts off whatever is being said first.
@@ -74,7 +94,7 @@ export function speakNow(text: string, opts: SpeakOptions & { interrupt?: boolea
   if (opts.interrupt) stop();
   if (viaScreenReader()) return announce(text, opts.onDone);
   const done = () => opts.onDone?.();
-  Speech.speak(text, { language: opts.language ?? 'ar-SA', rate: opts.rate, onDone: done, onStopped: done, onError: done });
+  deviceSpeak(text, opts, done);
 }
 
 // ---------- cloud voice ----------
@@ -155,7 +175,7 @@ async function next() {
   };
 
   if (!file) {
-    Speech.speak(item.text, { language: item.opts.language ?? 'ar-SA', rate: item.opts.rate, onDone: done, onError: done });
+    deviceSpeak(item.text, item.opts, done);
     return;
   }
   const p = getPlayer();

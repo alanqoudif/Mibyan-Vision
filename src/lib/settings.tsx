@@ -13,7 +13,7 @@ export type Settings = {
   /** Keep listening after each answer, like a real conversation. */
   continuous: boolean;
   /** Seconds between frames in live mode. */
-  liveEvery: 3 | 5 | 10;
+  liveEvery: 1 | 3 | 5 | 10;
   /** Short status sounds (listening, photo taken, thinking, error). */
   sounds: boolean;
   /** Coach the user to aim the camera before reading text, money, labels or screens. */
@@ -39,7 +39,7 @@ const DEFAULTS: Settings = {
   model: 'smart',
   haptics: true,
   continuous: true,
-  liveEvery: 5,
+  liveEvery: 1,
   sounds: true,
   framing: true,
   bargeIn: false,

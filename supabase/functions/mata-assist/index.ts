@@ -306,7 +306,8 @@ Deno.serve(async (req) => {
   const mode: string = MODE_PROMPTS[lang][body.mode] || body.mode === "frame" || body.mode === "guide" ? body.mode : "ask";
   const live = mode === "live";
   const quick = mode === "frame" || mode === "guide";
-  const model = MODELS[body.model] ?? MODELS.smart;
+  // Live mode is about reacting in time, so it always takes the fast model.
+  const model = live ? MODELS.fast : MODELS[body.model] ?? MODELS.smart;
   const detail = DETAIL[lang][body.detail === false ? 1 : 0];
   const memory = USES_MEMORY.has(mode) ? strings(body.memory, 40, 200) : [];
   const meds = mode === "meds" && Array.isArray(body.meds)
@@ -380,7 +381,7 @@ Deno.serve(async (req) => {
       model,
       stream: true,
       reasoning: { effort: "minimal" },
-      max_tokens: quick ? 120 : live ? 400 : 900,
+      max_tokens: quick ? 120 : live ? 60 : 900,
       temperature: live || quick ? 0.2 : 0.6,
       messages,
     }),

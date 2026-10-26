@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ const DOT: Record<GlassesStatus, string> = {
   unregistered: '#FF9F0A',
   registering: '#FF9F0A',
   needsCamera: '#FF9F0A',
+  needsUpdate: '#FF9F0A',
   ready: '#34C759',
 };
 
@@ -26,9 +27,11 @@ export default function GlassesScreen() {
   const { t, dir } = useI18n();
   const router = useRouter();
   const glasses = useGlasses();
+  // Tabs stay mounted; re-check when coming back from a camera screen.
+  useFocusEffect(glasses.refresh);
   const status = t.glassesStatus[glasses.status];
 
-  const intervals = ([3, 5, 10] as const).map((n) => ({ id: String(n) as '3' | '5' | '10', label: t.seconds(n) }));
+  const intervals = ([1, 3, 5] as const).map((n) => ({ id: String(n) as '1' | '3' | '5', label: t.seconds(n) }));
 
   return (
     <ScrollView
@@ -100,7 +103,7 @@ export default function GlassesScreen() {
           <Text variant="heading">{t.liveEvery}</Text>
           <Segmented
             options={intervals}
-            value={String(settings.liveEvery) as '3' | '5' | '10'}
+            value={String(Math.min(settings.liveEvery, 5)) as '1' | '3' | '5'}
             onChange={(v) => update({ liveEvery: Number(v) as Settings['liveEvery'] })}
           />
           <Text variant="caption" tone="secondary">

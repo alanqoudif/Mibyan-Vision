@@ -115,6 +115,8 @@ const ar = {
   resume: 'كمّل',
   liveEmpty: 'لما أشوف شي جديد أو مهم بقولك هنا وبصوت.',
   liveSource: (glasses: boolean): string => (glasses ? 'من النظارة' : 'من كاميرا الجوال'),
+  obstacle: (level: number, side: 'left' | 'center' | 'right', label: string): string =>
+    `${label || ['', 'شي قريب', 'قريب', 'قريب جدًا'][level]} ${{ left: 'يسار', center: 'قدام', right: 'يمين' }[side]}`,
 
   // trusted helpers
   helperNotified: (names: string[]) => `أرسلت لـ ${names.join(' و')}. بقولك لما أحد يدخل.`,
@@ -282,8 +284,9 @@ const ar = {
     unregistered: { badge: 'غير مربوطة', note: 'اربط النظارة عشان الصور تجي من كاميرتها بدل الجوال. بيفتح لك تطبيق Meta AI توافق.', action: 'ربط النظارة' },
     registering: { badge: 'جاري الربط', note: 'كمّل الموافقة في تطبيق Meta AI وارجع هنا.' },
     needsCamera: { badge: 'تحتاج إذن', note: 'النظارة مربوطة، باقي تسمح بالكاميرا من تطبيق Meta AI.', action: 'السماح بالكاميرا' },
+    needsUpdate: { badge: 'تحتاج تحديث', note: 'تطبيق مبيان على النظارة يحتاج تحديث قبل ما تشتغل الكاميرا. الصور حاليًا من الجوال.', action: 'تحديث تطبيق النظارة' },
     ready: { badge: 'متصلة', note: 'الصور تجي من كاميرا النظارة.' },
-  } as Record<'unsupported' | 'unregistered' | 'registering' | 'needsCamera' | 'ready', { badge: string; note: string; action?: string }>,
+  } as Record<'unsupported' | 'unregistered' | 'registering' | 'needsCamera' | 'needsUpdate' | 'ready', { badge: string; note: string; action?: string }>,
 };
 
 type Dict = typeof ar;
@@ -390,6 +393,8 @@ const en: Dict = {
   resume: 'Resume',
   liveEmpty: 'When I notice something new or important, I’ll say it here and out loud.',
   liveSource: (glasses: boolean) => (glasses ? 'From glasses' : 'From phone camera'),
+  obstacle: (level: number, side: 'left' | 'center' | 'right', label: string) =>
+    `${label || ['', 'Something near', 'Close', 'Very close'][level]} ${{ left: 'left', center: 'ahead', right: 'right' }[side]}`,
 
   // trusted helpers
   helperNotified: (names: string[]) => `I’ve alerted ${names.join(' and ')}. I’ll tell you when someone joins.`,
@@ -554,6 +559,7 @@ const en: Dict = {
     unregistered: { badge: 'Not linked', note: 'Link your glasses so photos come from their camera instead of the phone. Meta AI will open to approve.', action: 'Link glasses' },
     registering: { badge: 'Linking', note: 'Finish approving in the Meta AI app, then come back.' },
     needsCamera: { badge: 'Needs permission', note: 'Glasses linked. Allow camera access in the Meta AI app.', action: 'Allow camera' },
+    needsUpdate: { badge: 'Needs update', note: 'The Mubayan app on your glasses needs an update before the camera works. Photos come from the phone for now.', action: 'Update glasses app' },
     ready: { badge: 'Connected', note: 'Photos come from the glasses camera.' },
   },
 };

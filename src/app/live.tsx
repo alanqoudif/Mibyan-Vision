@@ -32,6 +32,8 @@ import { memoryNotes, recordTags } from '@/lib/memory';
 import { SPEECH_RATE, useSettings } from '@/lib/settings';
 import * as Voice from '@/lib/voice';
 
+import { Glasses, type ObstacleReading } from '../../modules/mubayan-glasses';
+
 type Note = { id: number; text: string; urgent: boolean; at: Date };
 
 // Talking to live mode: louder than street noise, and a pause ends the question.
@@ -41,6 +43,15 @@ const MAX_QUESTION_MS = 12000;
 /** Restart an idle recording now and then so it never grows long. */
 const IDLE_RESTART_MS = 20000;
 const KEEP_AWAKE = 'live';
+const LIVE_ENDPOINT = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/mata-live`;
+const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+/**
+ * Obstacle sensor thresholds for near / close / very close: closeness relative to the floor
+ * in front of the feet (~1.5 m), so 1 ≈ 1.5 m and higher is nearer. Tuned by walking up to a wall.
+ */
+const OBSTACLE_LEVELS = [1.3, 1.6, 2];
+/** How Gemini's warnings start, to flag them as urgent. */
+const WARNING = /^(انتبه|وقف|حاسب|careful|stop|watch out)/i;
 
 /**
  * Live mode: grabs a frame every few seconds and only speaks when the model
@@ -71,10 +82,34 @@ export default function LiveScreen() {
   const [notes, setNotes] = useState<Note[]>([]);
   const fromGlasses = useCameraSource().glasses;
   const [failed, setFailed] = useState(false);
+  // Gemini Live: a natural voice about a second after something comes into view. The
+  // frame-by-frame pipeline is the fallback (Expo Go, no key on the server, connection lost).
+  const [legacy, setLegacy] = useState(!Glasses);
+  // Gemini Live is connected and can say alerts.
+  const liveReady = useRef(false);
+  const [obstacle, setObstacle] = useState<ObstacleReading | null>(null);
+
+  // Parking-sensor warnings from the glasses video, on the phone: beeps within a frame or two.
+  useEffect(() => {
+    if (!Glasses) return;
+    const sub = Glasses.addListener('onObstacle', (r) => {
+      setObstacle(r);
+      if (__DEV__) console.log('obstacle', r.level, r.side, r.label, r.values.map((v) => v.toFixed(2)).join(' '));
+    });
+    Glasses.obstacleStart(OBSTACLE_LEVELS, lang);
+    return () => {
+      sub.remove();
+      Glasses?.obstacleStop();
+    };
+  }, [lang]);
 
   const alive = useRef(true);
   const pausedRef = useRef(false);
-  const busy = useRef(false);
+  // Looks in flight. Two overlap so a new frame goes out before the last answer is back;
+  // an answer older than one already handled is dropped.
+  const inFlight = useRef(0);
+  const lookSeq = useRef(0);
+  const lastLook = useRef(0);
   const speaking = useRef(false);
   const asking = useRef(false);
   const micOpen = useRef(false);
@@ -87,7 +122,7 @@ export default function LiveScreen() {
   // ---------- frames ----------
   const captureFrame = useCallback(async (): Promise<string | undefined> => {
     try {
-      let uri = await captureFromGlasses();
+      let uri = await captureFromGlasses('frame');
       // The phone camera only works on screen, so it needs the screen kept on.
       if (uri) deactivateKeepAwake(KEEP_AWAKE).catch(() => {});
       else activateKeepAwakeAsync(KEEP_AWAKE).catch(() => {});
@@ -96,8 +131,9 @@ export default function LiveScreen() {
       }
       if (!uri) return undefined;
       toldNoCamera.current = false;
-      const ref = await ImageManipulator.manipulate(uri).resize({ width: 640 }).renderAsync();
-      return (await ref.saveAsync({ base64: true, compress: 0.55, format: SaveFormat.JPEG })).base64;
+      // Small and light: upload time counts toward every warning.
+      const ref = await ImageManipulator.manipulate(uri).resize({ width: 512 }).renderAsync();
+      return (await ref.saveAsync({ base64: true, compress: 0.5, format: SaveFormat.JPEG })).base64;
     } catch (e) {
       console.warn('live capture failed', e);
       return undefined;
@@ -122,6 +158,11 @@ export default function LiveScreen() {
 
   const say = useCallback(
     (text: string, interrupt = false) => {
+      // Realtime mode: Gemini says it in its own voice; its events drive `speaking`.
+      if (!legacy && liveReady.current) {
+        Glasses?.liveSay(text);
+        return;
+      }
       speaking.current = true;
       setOrb('speaking');
       const done = () => {
@@ -129,17 +170,18 @@ export default function LiveScreen() {
         if (!alive.current) return;
         setOrb(pausedRef.current ? 'idle' : 'listening');
         // Drop what the mic heard of our own voice.
-        if (!asking.current) openMic();
+        if (!asking.current && legacy) openMic();
       };
       Voice.speakNow(text, { language: speechLang, rate: SPEECH_RATE[settings.speed], onDone: done, interrupt });
     },
-    [openMic, settings.speed, speechLang],
+    [legacy, openMic, settings.speed, speechLang],
   );
 
   // ---------- one look ----------
   const tick = useCallback(async () => {
-    if (!alive.current || pausedRef.current || busy.current || speaking.current || asking.current) return;
-    busy.current = true;
+    if (!alive.current || pausedRef.current || inFlight.current >= 2 || speaking.current || asking.current) return;
+    inFlight.current++;
+    const look = ++lookSeq.current;
     setOrb('thinking');
     try {
       const image = await captureFrame();
@@ -165,13 +207,16 @@ export default function LiveScreen() {
       );
       setFailed(false);
       failedRef.current = false;
+      if (look < lastLook.current) return;
+      lastLook.current = look;
       const text = raw.trim();
       if (!alive.current || pausedRef.current || asking.current || !text || text.includes(SILENT)) return;
 
       const urgent = text.startsWith(URGENT);
       const clean = text.replace(/^!\s*/, '');
       context.current.push({ role: 'assistant', content: clean });
-      setNotes((n) => [{ id: nextId.current++, text: clean, urgent, at: new Date() }, ...n].slice(0, 30));
+      // In realtime mode the note comes from Gemini's transcript of what it actually said.
+      if (legacy) setNotes((n) => [{ id: nextId.current++, text: clean, urgent, at: new Date() }, ...n].slice(0, 30));
       if (settings.haptics) {
         if (urgent) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -183,10 +228,10 @@ export default function LiveScreen() {
       failedRef.current = true;
       setFailed(true);
     } finally {
-      busy.current = false;
-      if (alive.current && !speaking.current) setOrb(pausedRef.current ? 'idle' : 'listening');
+      inFlight.current--;
+      if (alive.current && !speaking.current && !inFlight.current) setOrb(pausedRef.current ? 'idle' : 'listening');
     }
-  }, [captureFrame, lang, say, settings.directions, settings.haptics, settings.model, t]);
+  }, [captureFrame, lang, legacy, say, settings.directions, settings.haptics, settings.model, t]);
 
   // ---------- a spoken question ----------
   const ask = useCallback(async () => {
@@ -202,7 +247,7 @@ export default function LiveScreen() {
       const uri = recorder.uri;
       if (!uri) return;
       // The glasses take one photo at a time; let a look in progress finish.
-      for (let i = 0; i < 50 && busy.current; i++) await sleep(100);
+      for (let i = 0; i < 50 && inFlight.current; i++) await sleep(100);
       const [audio, image] = await Promise.all([new File(uri).base64(), captureFrame()]);
       let raw = '';
       let stopped = false;
@@ -264,8 +309,71 @@ export default function LiveScreen() {
     else if (!v.heard && now - v.start > IDLE_RESTART_MS) openMic();
   }, [recState.metering, recState.durationMillis, ask, openMic]);
 
-  // ---------- lifecycle ----------
+  // ---------- realtime (Gemini Live) ----------
   useEffect(() => {
+    if (legacy || !Glasses) return;
+    alive.current = true;
+    let heard = false;
+    if (!camPerm?.granted) requestCamPerm();
+    activateKeepAwakeAsync(KEEP_AWAKE).catch(() => {});
+    const sub = Glasses.addListener('onLiveEvent', (e) => {
+      if (!alive.current) return;
+      if (__DEV__ && e.type !== 'speaking') console.log('gemini live', JSON.stringify(e));
+      if (e.type === 'state') {
+        liveReady.current = e.state === 'live';
+        if (e.state === 'live') {
+          heard = true;
+          setFailed(false);
+          setOrb('listening');
+        } else if (e.state !== 'stopped') setOrb('thinking');
+      } else if (e.type === 'speaking') {
+        speaking.current = e.speaking;
+        setOrb(e.speaking ? 'speaking' : 'listening');
+      } else if (e.type === 'model') {
+        const urgent = WARNING.test(e.text);
+        setNotes((n) => [{ id: nextId.current++, text: e.text, urgent, at: new Date() }, ...n].slice(0, 30));
+        if (settings.haptics) {
+          if (urgent) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      } else if (e.type === 'error') {
+        console.warn('realtime live failed', e.message);
+        // Never connected: use the frame-by-frame mode instead. Dropped later: say so.
+        if (!heard) setLegacy(true);
+        else setFailed(true);
+      }
+    });
+    Glasses.liveStart(LIVE_ENDPOINT, ANON, lang, settings.directions).catch((e) => {
+      console.warn('realtime live unavailable, using frames', e);
+      if (alive.current) setLegacy(true);
+    });
+
+    // Phone-camera frames for when the glasses aren't sending video.
+    const frames = setInterval(async () => {
+      if (pausedRef.current || AppState.currentState !== 'active' || !cameraRef.current || !cameraReady.current) return;
+      try {
+        const pic = await cameraRef.current.takePictureAsync({ quality: 0.5, shutterSound: false });
+        const ref = await ImageManipulator.manipulate(pic.uri).resize({ width: 512 }).renderAsync();
+        const out = await ref.saveAsync({ base64: true, compress: 0.5, format: SaveFormat.JPEG });
+        if (out.base64) Glasses?.liveSendFrame(out.base64);
+      } catch {}
+    }, 1000);
+
+    return () => {
+      liveReady.current = false;
+      sub.remove();
+      clearInterval(frames);
+      Glasses?.liveStop();
+      deactivateKeepAwake(KEEP_AWAKE).catch(() => {});
+      stopGlasses();
+    };
+    // Starts once per mode; settings are read at start.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legacy]);
+
+  // ---------- lifecycle (frame-by-frame mode) ----------
+  useEffect(() => {
+    if (!legacy) return;
     alive.current = true;
     (async () => {
       if (!camPerm?.granted) await requestCamPerm();
@@ -284,17 +392,18 @@ export default function LiveScreen() {
       deactivateKeepAwake(KEEP_AWAKE).catch(() => {});
       stopGlasses();
     };
-    // Runs once; later values are read through refs.
+    // Runs once per mode; later values are read through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [legacy]);
 
-  // A setTimeout chain, not setInterval: the glasses only serve one photo request at a time,
-  // so each look must finish before the next is scheduled.
+  // A new look every interval without waiting for the last answer; `tick` skips a beat
+  // while two are already in flight.
+  // Runs in both modes: in realtime mode it's what spots hazards, and Gemini says them.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     let stopped = false;
-    const loop = async () => {
-      await tick();
+    const loop = () => {
+      tick();
       if (!stopped) timer = setTimeout(loop, settings.liveEvery * 1000);
     };
     timer = setTimeout(loop, 1200);
@@ -309,6 +418,11 @@ export default function LiveScreen() {
     pausedRef.current = next;
     setPaused(next);
     if (settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (!legacy) {
+      Glasses?.livePause(next);
+      setOrb(next ? 'idle' : 'listening');
+      return;
+    }
     if (next) {
       setOrb('idle');
       say(t.liveStopped, true);
@@ -351,6 +465,14 @@ export default function LiveScreen() {
               {t.liveSource(fromGlasses)}
             </Text>
           </View>
+          {fromGlasses && !!obstacle?.level && (
+            <View style={[styles.sourceChip, { backgroundColor: obstacle.level === 3 ? '#FF3B30' : '#FF9F0A' }]}>
+              <SymbolView name="sensor.fill" size={14} tintColor="#FFFFFF" />
+              <Text variant="caption" style={{ color: '#FFFFFF' }}>
+                {t.obstacle(obstacle.level, obstacle.side, obstacle.label)}
+              </Text>
+            </View>
+          )}
           <View style={styles.orbCorner}>
             <Orb size={46} state={paused ? 'idle' : orb} />
           </View>

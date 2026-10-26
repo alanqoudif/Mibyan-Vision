@@ -1,4 +1,5 @@
 import ExpoModulesCore
+import UIKit
 import MWDATCamera
 import MWDATCore
 
@@ -14,8 +15,20 @@ final class GlassesUnavailableException: GenericException<String>, @unchecked Se
   override var reason: String { "Glasses unavailable: \(param)" }
 }
 
+/// The Device Access Toolkit app on the glasses is out of date; Meta AI can update it.
+/// "glasses-app-update" is how the JS side recognizes it.
+final class GlassesAppUpdateException: Exception, @unchecked Sendable {
+  override var reason: String { "The app on the glasses needs an update (glasses-app-update)" }
+}
+
 final class CaptureFailedException: GenericException<String>, @unchecked Sendable {
   override var reason: String { "Photo capture failed: \(param)" }
+}
+
+/// Shown the glasses' live video, frame by frame, on the main thread.
+@MainActor
+protocol GlassesFrameObserver: AnyObject {
+  func show(_ image: UIImage)
 }
 
 /// Owns the single `DeviceSession` + camera stream to the glasses. The stream is kept
@@ -33,6 +46,10 @@ final class GlassesCamera {
   private var sessionState: DeviceSessionState = .idle
   private var streamState: StreamState = .stopped
   private var lastError: String?
+  private var appUpdateRequired = false
+  /// Stays set until the user opens the update or the camera streams again, so the
+  /// Glasses tab can offer the update whenever it's opened.
+  private(set) var needsAppUpdate = false
   private var photoWaiter: CheckedContinuation<Data, Error>?
   private var photoTimeout: Task<Void, Never>?
   // `ListenerTokenBag.clear()` cancels asynchronously, so a cleared bag can still cancel
@@ -44,6 +61,13 @@ final class GlassesCamera {
   private var deviceSelector: AutoDeviceSelector?
   private var activeDevice: DeviceIdentifier?
   private var deviceTask: Task<Void, Never>?
+  // Video frames are decoded off the main thread, one at a time.
+  private let frameQueue = DispatchQueue(label: "mubayan.glasses.frames", qos: .userInitiated)
+  private let decoder = FrameDecoder()
+  private var latestFrame: UIImage?
+  private var latestFrameAt = Date.distantPast
+  private let frameObservers = NSHashTable<AnyObject>.weakObjects()
+  private var recentFiles: [URL] = []
 
   func configure() {
     guard !configured else { return }
@@ -86,6 +110,13 @@ final class GlassesCamera {
     return try await Wearables.shared.requestPermission(.camera) == .granted ? "granted" : "denied"
   }
 
+  /// Opens Meta AI on the update screen for the toolkit app on the glasses.
+  func openAppUpdate() async throws {
+    configure()
+    try await Wearables.shared.openDATGlassesAppUpdate()
+    needsAppUpdate = false
+  }
+
   func cameraPermission() async throws -> String {
     configure()
     return try await Wearables.shared.checkPermissionStatus(.camera) == .granted ? "granted" : "denied"
@@ -114,10 +145,59 @@ final class GlassesCamera {
       }
     }
 
+    return try save(data)
+  }
+
+  /// The latest video frame as a JPEG file URL. Much faster than `capturePhoto` (no photo
+  /// transfer over Bluetooth), at video resolution: good for live mode, not for reading.
+  func captureFrame() async throws -> URL {
+    configure()
+    guard Wearables.shared.registrationState == .registered else { throw NotRegisteredException() }
+    if streamState != .streaming {
+      guard try await Wearables.shared.checkPermissionStatus(.camera) == .granted else {
+        throw CameraPermissionException()
+      }
+    }
+    try await ensureStreaming()
+    let deadline = Date().addingTimeInterval(4)
+    while latestFrame == nil || Date().timeIntervalSince(latestFrameAt) > 1 {
+      if Date() > deadline { throw CaptureFailedException(lastError ?? "no video from the glasses") }
+      try await Task.sleep(for: .milliseconds(50))
+    }
+    guard let data = latestFrame?.jpegData(compressionQuality: 0.8) else {
+      throw CaptureFailedException("couldn't encode the frame")
+    }
+    return try save(data)
+  }
+
+  /// The latest video frame if it's at most `maxAge` seconds old.
+  func freshFrame(maxAge: TimeInterval) -> UIImage? {
+    Date().timeIntervalSince(latestFrameAt) <= maxAge ? latestFrame : nil
+  }
+
+  func addFrameObserver(_ observer: GlassesFrameObserver) {
+    frameObservers.add(observer)
+    if let latestFrame { observer.show(latestFrame) }
+  }
+
+  /// Writes a capture to a temp file, keeping only the last few on disk.
+  private func save(_ data: Data) throws -> URL {
     let url = FileManager.default.temporaryDirectory
       .appendingPathComponent("glasses-\(UUID().uuidString).jpg")
     try data.write(to: url)
+    recentFiles.append(url)
+    while recentFiles.count > 4 {
+      try? FileManager.default.removeItem(at: recentFiles.removeFirst())
+    }
     return url
+  }
+
+  private func receiveFrame(_ image: UIImage) {
+    latestFrame = image
+    latestFrameAt = Date()
+    for observer in frameObservers.allObjects {
+      (observer as? GlassesFrameObserver)?.show(image)
+    }
   }
 
   func stop() {
@@ -136,6 +216,7 @@ final class GlassesCamera {
       resetSessionTokens()
       clearStream()
       lastError = nil
+      appUpdateRequired = false
       guard let selector = deviceSelector else { throw GlassesUnavailableException("the SDK isn't configured") }
       try await waitForDevice(selector)
       let newSession = try Wearables.shared.createSession(deviceSelector: selector)
@@ -144,7 +225,13 @@ final class GlassesCamera {
         Task { @MainActor in self?.sessionStateChanged(state) }
       }.store(in: sessionTokens)
       newSession.errorPublisher.listen { [weak self] error in
-        Task { @MainActor in self?.lastError = error.localizedDescription }
+        Task { @MainActor in
+          self?.lastError = error.localizedDescription
+          if error == .datAppOnTheGlassesUpdateRequired {
+            self?.appUpdateRequired = true
+            self?.needsAppUpdate = true
+          }
+        }
       }.store(in: sessionTokens)
       sessionState = .starting
       try newSession.start()
@@ -152,9 +239,10 @@ final class GlassesCamera {
     try await waitUntil("connecting to the glasses", failed: { $0.session == nil }) { $0.sessionState == .started }
 
     if camera == nil, let session {
-      // Low frame rate: we only need stills, and fewer frames leave more Bluetooth
-      // bandwidth for image quality.
-      let config = StreamConfiguration(videoCodec: .raw, resolution: .high, frameRate: 7)
+      // Medium at 15 fps: smooth enough for the preview, and Meta notes lower settings
+      // compress less over Bluetooth. hvc1 as in Meta's sample: raw frame delivery can
+      // stall for good now that the on-glasses app model is always on.
+      let config = StreamConfiguration(videoCodec: .hvc1, resolution: .medium, frameRate: 15)
       guard let newCamera = try session.addCamera(config: config) else {
         throw GlassesUnavailableException("couldn't open the camera")
       }
@@ -172,10 +260,20 @@ final class GlassesCamera {
       stream.photoDataPublisher.listen { [weak self] photo in
         Task { @MainActor in self?.receivePhoto(photo.data) }
       }.store(in: streamTokens)
+      let queue = frameQueue
+      let decoder = decoder
+      stream.videoFramePublisher.listen { [weak self] frame in
+        queue.async {
+          guard let image = decoder.decode(frame.sampleBuffer) else { return }
+          if let cgImage = image.cgImage { ObstacleSensor.shared.offer(cgImage) }
+          Task { @MainActor in self?.receiveFrame(image) }
+        }
+      }.store(in: streamTokens)
       streamState = .starting
       stream.start()
     }
     try await waitUntil("starting the camera", failed: { $0.camera == nil }) { $0.streamState == .streaming }
+    needsAppUpdate = false
   }
 
   /// Fails fast when no glasses are connected (off, folded, or out of range), so callers
@@ -197,6 +295,7 @@ final class GlassesCamera {
   ) async throws {
     let deadline = Date().addingTimeInterval(15)
     while !done(self) {
+      if appUpdateRequired { throw GlassesAppUpdateException() }
       if failed(self) {
         throw GlassesUnavailableException(lastError ?? "\(step) stopped")
       }
@@ -235,6 +334,9 @@ final class GlassesCamera {
     camera?.stop()
     camera = nil
     streamState = .stopped
+    latestFrame = nil
+    let decoder = decoder
+    frameQueue.async { decoder.reset() }
     failPhoto(lastError ?? "the camera stopped")
   }
 
