@@ -155,9 +155,6 @@ export const MODES: Mode[] = [
   },
 ];
 
-/** Modes offered as one-shot suggestions on the home screen. */
-export const SUGGESTIONS = MODES.filter((m) => m.id !== 'ask' && m.id !== 'live');
-
 export function getMode(id: string | undefined): Mode {
   return MODES.find((m) => m.id === id) ?? MODES.find((m) => m.id === 'ask')!;
 }

@@ -1,167 +1,119 @@
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CircleButton, GlassesPill } from '@/components/chrome';
-import { Composer } from '@/components/composer';
-import { OrbMark } from '@/components/orb';
+import { GlassesPill } from '@/components/chrome';
+import { Orb } from '@/components/orb';
 import { Text } from '@/components/text';
-import { BottomTabInset, OrbColors, Radius, Spacing, useColors } from '@/constants/theme';
+import { BottomTabInset, Radius, Spacing, useColors } from '@/constants/theme';
 import { useGlasses } from '@/lib/glasses';
 import { useContacts } from '@/lib/helper';
 import { useI18n } from '@/lib/i18n';
-import { SUGGESTIONS, modeText, type Mode, type ModeId } from '@/lib/modes';
+import { useSettings } from '@/lib/settings';
 
+/**
+ * Voice first: the whole screen is one button. The user says what they need ("read this",
+ * "how much money is this") and the session picks the right tool from what they said.
+ */
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
   const { t, dir } = useI18n();
+  const { settings } = useSettings();
   const glasses = useGlasses();
   // With saved helpers, one tap alerts them; otherwise it falls back to a code to share.
   const hasHelpers = useContacts().some((p) => p.reachable);
 
-  const h = new Date().getHours();
-  const greeting = h < 12 ? t.greetMorning : h < 18 ? t.greetAfternoon : t.greetEvening;
+  useEffect(() => {
+    if (!settings.onboarded) router.push('/welcome');
+    // Only on first mount; onboarding sets the flag itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const open = (mode: ModeId, q?: string) =>
-    mode === 'find'
-      ? router.push('/find')
-      : router.push({ pathname: '/session', params: q ? { mode, q } : { mode } });
+  const h = new Date().getHours();
+  const greeting = (h < 12 ? t.helloMorning : h < 18 ? t.helloAfternoon : t.helloEvening)(settings.name);
+  const talk = () => router.push({ pathname: '/session', params: { mode: 'ask' } });
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: c.background, direction: dir }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={[styles.root, { backgroundColor: c.background, direction: dir }]} onMagicTap={talk}>
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.two }]}>
         <GlassesPill connected={glasses.status === 'ready'} />
-        <CircleButton icon="plus.bubble" label={t.newChat} onPress={() => open('ask')} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardDismissMode="on-drag">
-        <Text variant="display" accessibilityRole="header" style={styles.headline}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t.talkButton}
+        accessibilityHint={t.talkHint}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          talk();
+        }}
+        style={({ pressed }) => [styles.talk, { opacity: pressed ? 0.8 : 1 }]}>
+        <Text variant="title" center>
           {greeting}
         </Text>
+        <Orb size={220} />
+        <Text variant="title" center>
+          {t.talkButton}
+        </Text>
+        <Text tone="secondary" center>
+          {t.talkExamples}
+        </Text>
+      </Pressable>
 
-        <LiveCard onPress={() => router.push('/live')} />
-        <ActionCard
+      <View style={[styles.actions, { paddingBottom: insets.bottom + BottomTabInset + Spacing.three }]}>
+        <BigButton
+          icon="dot.radiowaves.left.and.right"
+          label={t.liveShort}
+          hint={t.liveSubtitle}
+          onPress={() => router.push('/live')}
+        />
+        <BigButton
           icon="person.wave.2.fill"
-          title={t.helperCardTitle}
-          subtitle={t.helperCardSubtitle}
+          label={t.helperShort}
+          hint={t.helperCardSubtitle}
           onPress={() => router.push(hasHelpers ? { pathname: '/helper', params: { notify: 'all' } } : '/helper')}
         />
-        <ActionCard
-          icon="location.north.circle.fill"
-          title={t.qiblaTitle}
-          subtitle={t.qiblaCardSubtitle}
-          onPress={() => router.push('/qibla')}
+        <BigButton
+          icon="square.grid.2x2.fill"
+          label={t.toolsTitle}
+          hint={t.toolsHint}
+          onPress={() => router.push('/tools')}
         />
-
-        <View style={styles.list}>
-          {SUGGESTIONS.map((m) => (
-            <Suggestion key={m.id} mode={m} onPress={() => open(m.id)} />
-          ))}
-        </View>
-      </ScrollView>
-
-      <Composer
-        bottomInset={insets.bottom + BottomTabInset}
-        onSubmit={(text) => open('ask', text)}
-        onVoice={() => open('ask')}
-      />
-    </KeyboardAvoidingView>
+      </View>
+    </View>
   );
 }
 
-function LiveCard({ onPress }: { onPress: () => void }) {
-  const c = useColors();
-  const { t } = useI18n();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t.liveTitle}
-      accessibilityHint={t.liveSubtitle}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onPress();
-      }}
-      style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
-      <LinearGradient
-        colors={[`${OrbColors[0]}1F`, `${OrbColors[2]}26`, `${OrbColors[1]}1F`]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.live, { borderColor: c.border }]}>
-        <OrbMark size={44} />
-        <View style={{ flex: 1, gap: Spacing.half }}>
-          <Text variant="heading">{t.liveTitle}</Text>
-          <Text variant="caption" tone="secondary">
-            {t.liveSubtitle}
-          </Text>
-        </View>
-        <View style={[styles.liveGo, { backgroundColor: c.text }]}>
-          <SymbolView name="play.fill" size={16} tintColor={c.background} />
-        </View>
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
-function ActionCard({
+function BigButton({
   icon,
-  title,
-  subtitle,
+  label,
+  hint,
   onPress,
 }: {
   icon: SFSymbol;
-  title: string;
-  subtitle: string;
+  label: string;
+  hint: string;
   onPress: () => void;
 }) {
   const c = useColors();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
-      accessibilityHint={subtitle}
+      accessibilityLabel={label}
+      accessibilityHint={hint}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
       }}
-      style={({ pressed }) => [styles.live, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
-      <View style={[styles.helperIcon, { backgroundColor: c.surface }]}>
-        <SymbolView name={icon} size={24} tintColor={c.text} />
-      </View>
-      <View style={{ flex: 1, gap: Spacing.half }}>
-        <Text variant="heading">{title}</Text>
-        <Text variant="caption" tone="secondary">
-          {subtitle}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function Suggestion({ mode, onPress }: { mode: Mode; onPress: () => void }) {
-  const c = useColors();
-  const { lang } = useI18n();
-  const { prompt } = modeText(mode, lang);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={prompt}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      style={({ pressed }) => [styles.suggestion, pressed && { backgroundColor: c.surface }]}>
-      <LinearGradient colors={mode.tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.thumb}>
-        <SymbolView name={mode.icon} size={24} tintColor="#FFFFFF" weight="semibold" />
-      </LinearGradient>
-      <Text variant="body" style={{ flex: 1 }}>
-        {prompt}
+      style={({ pressed }) => [styles.big, { backgroundColor: c.surface, opacity: pressed ? 0.7 : 1 }]}>
+      <SymbolView name={icon} size={28} tintColor={c.text} />
+      <Text variant="heading" center>
+        {label}
       </Text>
     </Pressable>
   );
@@ -169,34 +121,16 @@ function Suggestion({ mode, onPress }: { mode: Mode; onPress: () => void }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-  },
-  scroll: { paddingHorizontal: Spacing.three, paddingTop: Spacing.four, paddingBottom: Spacing.four, gap: Spacing.four },
-  headline: { marginBottom: Spacing.one },
-  live: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    padding: Spacing.three,
+  topBar: { flexDirection: 'row', paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
+  talk: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.four, paddingHorizontal: Spacing.four },
+  actions: { flexDirection: 'row', gap: Spacing.three, paddingHorizontal: Spacing.three },
+  big: {
+    flex: 1,
+    minHeight: 96,
     borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  helperIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  liveGo: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  list: { gap: Spacing.one, marginHorizontal: -Spacing.two, marginTop: -Spacing.two },
-  suggestion: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
-    minHeight: 64,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
-    borderRadius: Radius.md,
+    justifyContent: 'center',
+    gap: Spacing.two,
+    padding: Spacing.three,
   },
-  thumb: { width: 48, height: 48, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
 });

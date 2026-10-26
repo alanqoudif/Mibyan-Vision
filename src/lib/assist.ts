@@ -145,3 +145,29 @@ export async function fetchHistory(): Promise<HistoryRow[]> {
   const json = (await res.json()) as { items: HistoryRow[] };
   return json.items ?? [];
 }
+
+/**
+ * Just the words in a short recording: streams an "ask" turn and stops as soon as the model's
+ * "§ question" line is complete, before it starts answering.
+ */
+export async function transcribe(audio: string, lang: Lang): Promise<string | null> {
+  const ctrl = new AbortController();
+  const out = { raw: '', heard: null as string | null };
+  try {
+    await streamAssist(
+      { mode: 'ask', audio, lang, model: 'fast', detail: false },
+      (delta) => {
+        out.raw += delta;
+        const s = splitAnswer(out.raw);
+        if (s.question && !s.pending) {
+          out.heard = s.question;
+          ctrl.abort();
+        }
+      },
+      ctrl.signal,
+    );
+  } catch (e) {
+    if (!out.heard) throw e;
+  }
+  return out.heard ?? splitAnswer(out.raw).question;
+}

@@ -12,9 +12,9 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>{t.tabHome}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'circle.circle', selected: 'circle.circle.fill' }} />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="history">
-        <NativeTabs.Trigger.Label>{t.tabHistory}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'play.rectangle', selected: 'play.rectangle.fill' }} />
+      <NativeTabs.Trigger name="assistant">
+        <NativeTabs.Trigger.Label>{t.tabAssistant}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="glasses">
         <NativeTabs.Trigger.Label>{t.tabGlasses}</NativeTabs.Trigger.Label>

@@ -21,7 +21,8 @@ import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
 import { Radius, Spacing, useColors } from '@/constants/theme';
 import { parseTags, splitAnswer, streamAssist, visibleText, type AssistRequest, type Turn } from '@/lib/assist';
-import { matchCommand, matchRoute } from '@/lib/commands';
+import { matchCommand, matchMode, matchRoute } from '@/lib/commands';
+import { dial, phoneIn } from '@/lib/emergency';
 import * as Earcons from '@/lib/earcons';
 import { FACES_ALLOWED, addFace, faceRefs } from '@/lib/faces';
 import { checkFrame } from '@/lib/framing';
@@ -332,12 +333,33 @@ export default function SessionScreen() {
               }
               if (cmd) detailOverride.current = cmd === 'detail';
               // "Where's the qibla?", "call mom to see with me": open that screen instead.
-              const route = matchRoute(s.question, (text) => contactIn(text)?.id);
+              const route = matchRoute(s.question, (text) => contactIn(text)?.id, phoneIn);
+              if (route && 'dial' in route) {
+                silence();
+                stopBarge();
+                setAnswer('');
+                setPhase('idle');
+                dial(route.dial);
+                return;
+              }
               if (route && !(route.pathname === '/session' && mode.id === 'where')) {
                 silence();
                 stopBarge();
                 alive.current = false;
                 router.replace(route);
+                return;
+              }
+              // The opening question of a plain chat picks the tool ("how much money is this").
+              const tool = mode.id === 'ask' && turns.current.length === 0 ? matchMode(s.question) : null;
+              if (tool) {
+                silence();
+                stopBarge();
+                alive.current = false;
+                router.replace(
+                  tool === 'find'
+                    ? { pathname: '/find', params: { q: s.question } }
+                    : { pathname: '/session', params: { mode: tool, q: s.question } },
+                );
                 return;
               }
             }
@@ -498,7 +520,7 @@ export default function SessionScreen() {
     (async () => {
       if (!camPerm?.granted) await requestCamPerm();
       await setAudioModeAsync({ playsInSilentMode: true });
-      if (q) run({ text: q, image: await captureFrame() });
+      if (q) run({ text: q, image: mode.id === 'ask' ? await captureFrame() : await framedCapture() });
       else if (mode.id === 'ask') startListening();
       else run({ image: await framedCapture() });
     })();
@@ -553,7 +575,10 @@ export default function SessionScreen() {
   const ss = String(elapsed % 60).padStart(2, '0');
 
   return (
-    <View style={[styles.root, { backgroundColor: c.background, direction: dir, paddingTop: insets.top + Spacing.two }]}>
+    <View
+      style={[styles.root, { backgroundColor: c.background, direction: dir, paddingTop: insets.top + Spacing.two }]}
+      // VoiceOver's two-finger double tap: talk, or cut the answer off and talk.
+      onMagicTap={onOrbPress}>
       <View style={styles.topBar}>
         <CircleButton icon="xmark" label={t.close} onPress={close} />
         <Text variant="caption" tone="secondary" accessibilityLabel={t.duration(elapsed)}>

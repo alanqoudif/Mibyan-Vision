@@ -26,6 +26,10 @@ export type Settings = {
   directions: 'clock' | 'simple';
   /** With VoiceOver on, speak answers through VoiceOver (its voice and rate) instead of the app's. */
   voiceOver: boolean;
+  /** What the assistant calls the user, asked during onboarding. */
+  name: string;
+  /** The first-launch voice setup has run (or was skipped). */
+  onboarded: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -42,6 +46,8 @@ const DEFAULTS: Settings = {
   faces: false,
   directions: 'clock',
   voiceOver: true,
+  name: '',
+  onboarded: false,
 };
 
 export const SPEECH_RATE: Record<Settings['speed'], number> = { slow: 0.85, normal: 1, fast: 1.2 };

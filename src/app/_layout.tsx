@@ -25,6 +25,9 @@ export default function RootLayout() {
           <Stack.Screen name="helper" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="help-view" options={{ presentation: 'modal' }} />
           <Stack.Screen name="contacts" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="tools" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="history" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
         </Stack>
       </ThemeProvider>
     </SettingsProvider>

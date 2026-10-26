@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Voice from '@/lib/voice';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView } from 'expo-symbols';
@@ -6,8 +6,9 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CircleButton } from '@/components/chrome';
 import { Text } from '@/components/text';
-import { BottomTabInset, Radius, Spacing, useColors } from '@/constants/theme';
+import { Radius, Spacing, useColors } from '@/constants/theme';
 import { fetchHistory, type HistoryRow } from '@/lib/assist';
 import { useI18n, voiceFor } from '@/lib/i18n';
 import { getMode, modeText } from '@/lib/modes';
@@ -23,7 +24,9 @@ function timeAgo(iso: string, t: ReturnType<typeof useI18n>['t']) {
   return d === 1 ? t.yesterday : t.daysAgo(d);
 }
 
+/** Past answers, opened from the Assistant tab; tapping one reads it out again. */
 export default function HistoryScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
   const { settings } = useSettings();
@@ -65,10 +68,11 @@ export default function HistoryScreen() {
       }
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + Spacing.four, paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
+        { paddingTop: insets.top + Spacing.two, paddingBottom: insets.bottom + Spacing.four },
       ]}
       ListHeaderComponent={
         <View style={styles.header}>
+          <CircleButton icon="xmark" label={t.close} onPress={() => router.back()} />
           <Text variant="display" accessibilityRole="header">
             {t.historyTitle}
           </Text>
@@ -134,7 +138,18 @@ const styles = StyleSheet.create({
     padding: Spacing.two + 2,
     borderRadius: Radius.md,
   },
-  thumb: { width: 48, height: 48, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
+  thumb: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  empty: { alignItems: 'center', gap: Spacing.three, marginTop: Spacing.six, paddingHorizontal: Spacing.five },
+  empty: {
+    alignItems: 'center',
+    gap: Spacing.three,
+    marginTop: Spacing.six,
+    paddingHorizontal: Spacing.five,
+  },
 });
