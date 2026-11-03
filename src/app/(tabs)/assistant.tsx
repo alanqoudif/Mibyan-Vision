@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { IconAction } from '@/components/chrome';
 import { Divider, Section, Segmented, ToggleRow, rows } from '@/components/settings-rows';
 import { Text } from '@/components/text';
 import { BottomTabInset, MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
+import { useAnnounce } from '@/lib/a11y';
 import * as Earcons from '@/lib/earcons';
 import { EMERGENCY_SERVICES, addEmergency, cleanPhone, dial, removeEmergency, useEmergency } from '@/lib/emergency';
 import { FACES_ALLOWED, removeFace, useFaces } from '@/lib/faces';
@@ -201,13 +203,13 @@ export default function AssistantScreen() {
                         </Text>
                       )}
                     </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t.medRemove(m.name)}
-                      hitSlop={8}
-                      onPress={() => removeMed(m.id)}>
-                      <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-                    </Pressable>
+                    <IconAction
+                      icon="trash"
+                      label={t.medRemove(m.name)}
+                      color={c.textSecondary}
+                      size={20}
+                      onPress={() => removeMed(m.id)}
+                    />
                   </View>
                 </View>
               ))
@@ -242,13 +244,13 @@ export default function AssistantScreen() {
                           {m.note} · {m.kind === 'remember' ? t.memoryRemembered : t.memorySeen} {ago(m.at, lang)}
                         </Text>
                       </View>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={t.memoryForget(m.label)}
-                        hitSlop={8}
-                        onPress={() => forget(m.id)}>
-                        <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-                      </Pressable>
+                      <IconAction
+                        icon="trash"
+                        label={t.memoryForget(m.label)}
+                        color={c.textSecondary}
+                        size={20}
+                        onPress={() => forget(m.id)}
+                      />
                     </View>
                   </View>
                 ))}
@@ -287,13 +289,13 @@ export default function AssistantScreen() {
                         <Text variant="heading" style={{ flex: 1 }}>
                           {f.name}
                         </Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={t.faceRemove(f.name)}
-                          hitSlop={8}
-                          onPress={() => removeFace(f.id)}>
-                          <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-                        </Pressable>
+                        <IconAction
+                          icon="trash"
+                          label={t.faceRemove(f.name)}
+                          color={c.textSecondary}
+                          size={20}
+                          onPress={() => removeFace(f.id)}
+                        />
                       </View>
                     </View>
                   ))
@@ -391,6 +393,7 @@ function EmergencySection() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState(false);
+  useAnnounce(error ? t.emergencyInvalid : null);
   const align = { textAlign: dir === 'rtl' ? 'right' : 'left', writingDirection: dir } as const;
 
   const save = () => {
@@ -437,13 +440,13 @@ function EmergencySection() {
                 </Text>
               </View>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t.emergencyRemove(e.name)}
-              hitSlop={8}
-              onPress={() => removeEmergency(e.id)}>
-              <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-            </Pressable>
+            <IconAction
+              icon="trash"
+              label={t.emergencyRemove(e.name)}
+              color={c.textSecondary}
+              size={20}
+              onPress={() => removeEmergency(e.id)}
+            />
           </View>
         </View>
       ))}
@@ -501,7 +504,11 @@ function EmergencySection() {
             onSubmitEditing={save}
             style={[styles.input, align, { color: c.text, backgroundColor: c.surface }]}
           />
-          {error && <Text style={{ color: c.stopText }}>{t.emergencyInvalid}</Text>}
+          {error && (
+            <Text accessibilityLiveRegion="polite" style={{ color: c.stopText }}>
+              {t.emergencyInvalid}
+            </Text>
+          )}
           <Pressable
             accessibilityRole="button"
             onPress={save}

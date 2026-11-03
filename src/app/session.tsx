@@ -29,6 +29,7 @@ import { FACES_ALLOWED, addFace, faceRefs } from '@/lib/faces';
 import { checkFrame } from '@/lib/framing';
 import { contactIn } from '@/lib/helper';
 import { captureFromGlasses, stopGlasses, takeGlassesNotice } from '@/lib/glasses';
+import { useAnnounce } from '@/lib/a11y';
 import { useI18n } from '@/lib/i18n';
 import { prepareMic } from '@/lib/listen';
 import { addMed, medRefs } from '@/lib/meds';
@@ -110,6 +111,9 @@ export default function SessionScreen() {
   const [spokenUpTo, setSpokenUpTo] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  // Written-only errors (mic permission, mic failure) would otherwise be silent for VoiceOver users;
+  // the network error already has its own spoken line.
+  useAnnounce(error && error !== t.errNetwork ? error : null);
 
   const alive = useRef(true);
   const gen = useRef(0); // bumps on every new turn so stale speech callbacks are ignored
@@ -615,6 +619,9 @@ export default function SessionScreen() {
                 ? t.tapToTalk
                 : t.retake
         }
+        // The current state ("Listening…", "Thinking…") is read when focus lands here.
+        accessibilityValue={STATUS[phase] ? { text: STATUS[phase] } : undefined}
+        accessibilityState={{ busy }}
         style={styles.orbWrap}>
         <Orb size={answer ? orbSmall : orbLarge} state={ORB[phase]} />
         {!!STATUS[phase] && (
@@ -641,7 +648,7 @@ export default function SessionScreen() {
           </Text>
         )}
         {!!error && (
-          <Text variant="body" style={{ color: c.stopText }}>
+          <Text variant="body" accessibilityLiveRegion="polite" style={{ color: c.stopText }}>
             {error}
           </Text>
         )}
@@ -723,7 +730,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  liveDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
+  liveDot: { position: 'absolute', top: 6, end: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
   orbWrap: { alignItems: 'center', paddingTop: Spacing.two, gap: Spacing.one },
   transcript: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.four, gap: Spacing.three },
   bubble: {

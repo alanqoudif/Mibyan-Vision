@@ -3,7 +3,7 @@ import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { Pressable, StyleSheet, View, type PressableProps, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
 
 /** Round header button with a soft shadow. Visual 48pt plus hitSlop, so the target is ≥ 56pt. */
@@ -49,6 +49,31 @@ export function CircleButton({
   );
 }
 
+/** Small inline icon action (call, remove) in a list row, with the full 56pt target. */
+export function IconAction({
+  icon,
+  label,
+  color,
+  size = 22,
+  onPress,
+}: {
+  icon: SFSymbol;
+  label: string;
+  color: string;
+  size?: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.iconAction, { opacity: pressed ? 0.5 : 1 }]}>
+      <SymbolView name={icon} size={size} tintColor={color} />
+    </Pressable>
+  );
+}
+
 /** Connection status only: the Wearables SDK doesn't report the glasses' battery level. */
 export function GlassesPill({ connected }: { connected: boolean }) {
   const c = useColors();
@@ -79,4 +104,5 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
   dot: { width: 7, height: 7, borderRadius: 4 },
+  iconAction: { width: MinTouch, height: MinTouch, alignItems: 'center', justifyContent: 'center' },
 });

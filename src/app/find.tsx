@@ -299,7 +299,7 @@ export default function FindScreen() {
     <View style={[styles.root, { backgroundColor: c.background, direction: dir, paddingTop: insets.top + Spacing.two }]}>
       <View style={styles.topBar}>
         <CircleButton icon="xmark" label={t.close} onPress={close} />
-        <Text variant="heading" numberOfLines={1} style={{ flex: 1, textAlign: 'center' }}>
+        <Text variant="heading" accessibilityRole="header" numberOfLines={2} style={{ flex: 1, textAlign: 'center' }}>
           {target ? t.findLooking(target) : t.findTitle}
         </Text>
         <View style={[styles.cam, { backgroundColor: c.surface }]} accessible accessibilityLabel={t.cameraOn}>

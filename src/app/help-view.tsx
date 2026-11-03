@@ -17,6 +17,7 @@ import {
   syncPushToken,
   viewSharing,
 } from '@/lib/helper';
+import { useAnnounce } from '@/lib/a11y';
 import { useI18n } from '@/lib/i18n';
 
 const VIEW_EVERY_MS = 1000;
@@ -39,6 +40,7 @@ export default function HelpViewScreen() {
   const [frame, setFrame] = useState<string | null>(null);
   const [ended, setEnded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useAnnounce(error ?? (ended ? t.helperEnded : null));
   const [text, setText] = useState('');
   const [sent, setSent] = useState<string[]>([]);
   const alive = useRef(true);
@@ -148,7 +150,9 @@ export default function HelpViewScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.topBar}>
         <CircleButton icon="xmark" label={t.close} onPress={() => router.back()} />
-        <Text variant="heading">{t.helpViewTitle}</Text>
+        <Text variant="heading" accessibilityRole="header">
+          {t.helpViewTitle}
+        </Text>
         <View style={{ width: 48 }} />
       </View>
 
@@ -223,7 +227,7 @@ export default function HelpViewScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t.helpingLeave(p.name)}
-                hitSlop={8}
+                style={styles.leave}
                 onPress={() => leaveHelping(p.id).then(() => setHelping((h) => h.filter((x) => x.id !== p.id)), () => {})}>
                 <Text variant="caption" style={{ color: c.stopText }}>
                   {t.helpingLeaveShort}
@@ -308,5 +312,6 @@ const styles = StyleSheet.create({
   quick: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   chip: { paddingHorizontal: Spacing.three, minHeight: MinTouch, borderRadius: Radius.full, justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  leave: { minHeight: MinTouch, minWidth: MinTouch, paddingHorizontal: Spacing.two, justifyContent: 'center' },
   pill: { minHeight: MinTouch, paddingVertical: Spacing.two, paddingHorizontal: Spacing.four, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
 });
