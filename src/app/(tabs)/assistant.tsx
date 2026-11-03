@@ -425,7 +425,7 @@ function EmergencySection() {
               onPress={() => dial(e.phone)}
               style={styles.callArea}>
               <View style={[styles.callIcon, { backgroundColor: c.success }]}>
-                <SymbolView name="phone.fill" size={20} tintColor="#FFFFFF" />
+                <SymbolView name="phone.fill" size={20} tintColor={c.onSuccess} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text variant="heading">{e.name}</Text>
@@ -455,7 +455,7 @@ function EmergencySection() {
         onPress={() => dial(EMERGENCY_SERVICES)}
         style={rows.row}>
         <View style={[styles.callIcon, { backgroundColor: c.stopText }]}>
-          <SymbolView name="cross.case.fill" size={20} tintColor="#FFFFFF" />
+          <SymbolView name="cross.case.fill" size={20} tintColor={c.background} />
         </View>
         <View style={{ flex: 1 }}>
           <Text variant="heading">{t.emergencyServices}</Text>

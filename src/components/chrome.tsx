@@ -6,7 +6,7 @@ import { Text } from '@/components/text';
 import { Radius, Spacing, useColors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
 
-/** Floating round button with a soft shadow — the Meta AI header buttons. */
+/** Round header button with a soft shadow. Visual 48pt plus hitSlop, so the target is ≥ 56pt. */
 export function CircleButton({
   icon,
   label,

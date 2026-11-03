@@ -45,7 +45,7 @@ export default function GlassesScreen() {
         {t.devices}
       </Text>
 
-      {/* Device hero, modelled after Meta AI's Devices card */}
+      {/* Device hero for the paired glasses */}
       <View
         style={[styles.device, { backgroundColor: c.card, shadowColor: c.shadow }]}
         accessible

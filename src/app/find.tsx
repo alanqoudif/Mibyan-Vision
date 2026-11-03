@@ -314,7 +314,7 @@ export default function FindScreen() {
       <View style={styles.center} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${status}. ${hint}`}>
         {phase === 'searching' ? (
           <View style={[styles.arrow, { backgroundColor: pos === 'ahead' ? c.success : c.surface }]}>
-            <SymbolView name={ICON[pos]} size={96} tintColor={pos === 'ahead' ? '#FFFFFF' : c.text} weight="bold" />
+            <SymbolView name={ICON[pos]} size={96} tintColor={pos === 'ahead' ? c.onSuccess : c.text} weight="bold" />
           </View>
         ) : (
           <Orb size={170} state={orb} />

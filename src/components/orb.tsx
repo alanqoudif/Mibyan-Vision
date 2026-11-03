@@ -20,7 +20,7 @@ const SPIN: Record<OrbState, number> = { idle: 9000, listening: 5000, thinking: 
 const AMP: Record<OrbState, number> = { idle: 0.03, listening: 0.08, thinking: 0.05, speaking: 0.14 };
 
 /**
- * Meta‑AI‑style orb: a rotating conic‑ish gradient ring with a coloured glow.
+ * The live-agent orb: a rotating gradient ring with a soft glow, Mibyan's "working" signal.
  * The hole "breathes" and the ring wobbles so it feels alive. Decorative only.
  */
 export function Orb({ size = 160, state = 'idle' }: { size?: number; state?: OrbState }) {

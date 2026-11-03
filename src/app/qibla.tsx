@@ -205,7 +205,7 @@ export default function QiblaScreen() {
         <View style={[styles.dial, { backgroundColor: found ? c.success : c.surface }]}>
           {/* The arrow points at the qibla relative to the top of the phone. */}
           <View style={{ transform: [{ rotate: `${delta ?? 0}deg` }] }}>
-            <SymbolView name="location.north.fill" size={110} tintColor={found ? '#FFFFFF' : c.text} weight="bold" />
+            <SymbolView name="location.north.fill" size={110} tintColor={found ? c.onSuccess : c.text} weight="bold" />
           </View>
         </View>
         <Text variant="title" center>
