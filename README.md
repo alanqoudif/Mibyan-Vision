@@ -1,10 +1,18 @@
 # مبيان فيجن · Mibyan Vision
 
-**عيون ذكية للمكفوفين وضعاف البصر.** تكلّم مبيان بصوتك، وهو يشوف من كاميرا نظارة Ray‑Ban Meta (أو كاميرا الجوال) ويرد عليك بصوت واضح، بلهجة خليجية أو بالإنجليزي.
+**مساعد بصري يتكيف مع احتياجك.** تكلّم مبيان بصوتك، وهو يشوف من كاميرا نظارة Ray‑Ban Meta (أو كاميرا الجوال) ويرد عليك بصوت واضح، بلهجة خليجية أو بالإنجليزي. أنشئ إضافات للدراسة والتنقل والسلامة وغيرها، مع استمرار أدوات الوصول لضعاف البصر.
 
-**Smart eyes for blind and low‑vision people.** Talk to Mibyan, and it looks through your Ray‑Ban Meta glasses (or the phone camera) and answers out loud, in Gulf Arabic or English.
+**A visual assistant that adapts to you.** Talk to Mibyan, and it looks through your Ray‑Ban Meta glasses (or phone camera) and answers out loud, in Gulf Arabic or English. Create plugins for study, mobility, safety, and more while keeping the existing accessibility tools.
 
-> iOS app built with Expo and React Native. The backend runs on Supabase Edge Functions.
+> iOS app built with Expo and React Native. The web platform and iOS app share private plugins and account settings through Supabase.
+
+## Platform structure
+
+- `app/` — Expo iOS app, including the existing glasses and assistant features.
+- `web/` — Next.js site for account access, plugin creation, browser camera trials, and pharmacy catalog management.
+- `packages/shared/` — shared plugin types, templates, and input validation.
+- `supabase/` — migrations and Edge Functions used by both clients.
+- Setup, OAuth, migration, and CSV import instructions: [PLATFORM_SETUP.md](PLATFORM_SETUP.md).
 
 ---
 
@@ -30,7 +38,7 @@
 ## 🧱 Architecture
 
 ```
-iPhone app (Expo / React Native)
+iPhone app — app/ (Expo / React Native)
 ├── src/app/                 Screens (Expo Router)
 │   ├── (tabs)/              Home · Glasses · My assistant
 │   ├── session.tsx          Talk / one-shot tools (read, money, meds…)
@@ -44,13 +52,20 @@ iPhone app (Expo / React Native)
 │                            Siri shortcuts, on-device text recognition
 └── plugins/                 Config plugins (Meta Wearables Info.plist/Pods, shortcuts)
 
-Supabase
+Web app — web/ (Next.js)
+├── src/app/                 Arabic-first platform and pharmacy catalog
+└── src/components/          Plugin editor, camera/microphone trial
+
+Shared platform — packages/shared/
+└── src/index.ts             Plugin presets, types, and validation
+
+Supabase — supabase/
 ├── functions/mata-assist    Vision + language model via OpenRouter, streamed answers
 ├── functions/mata-helper    "See with me" sessions, codes, trusted helpers, push
-└── migrations/              Helper sessions and contacts tables
+└── migrations/              Helper and private platform tables
 ```
 
-**Camera source.** Every capture tries the glasses first (`src/lib/glasses.ts`). The phone camera only opens as a fallback, when the glasses aren't linked, are folded, or are out of range.
+**Camera source.** Every capture tries the glasses first (`app/src/lib/glasses.ts`). The phone camera only opens as a fallback, when the glasses aren't linked, are folded, or are out of range.
 
 ---
 
@@ -70,30 +85,27 @@ npm install
 
 ### 2. Environment
 
-Create `.env.local`:
-
-```bash
-EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
-```
+Copy `app/.env.example` to `app/.env.local` and `web/.env.example` to `web/.env.local`. Fill in the existing Supabase URL and publishable/anon key. Apply the migration and configure OAuth using [PLATFORM_SETUP.md](PLATFORM_SETUP.md).
 
 ### 3. Run on a device
 
 ```bash
-npx expo run:ios --device
+npm exec --workspace app -- expo run:ios --device
 ```
 
 or build a development client with EAS:
 
 ```bash
-npx eas-cli@latest build --profile development --platform ios
+npm exec --workspace app -- eas build --profile development --platform ios
 ```
 
 then start the dev server:
 
 ```bash
-npx expo start
+npm run dev:app
 ```
+
+Run the website with `npm run dev:web`.
 
 ### 4. Connect the glasses
 

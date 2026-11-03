@@ -7,6 +7,8 @@ node_modules/
 .expo/
 dist/
 web-build/
+/web/.next/
+/web/out/
 expo-env.d.ts
 
 # Native
@@ -41,6 +43,8 @@ example
 # generated native folders
 /ios
 /android
+/app/ios/
+/app/android/
 
 # Supabase CLI
 supabase/.temp/
