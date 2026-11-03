@@ -5,6 +5,7 @@ import Animated, {
   Easing,
   cancelAnimation,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -18,18 +19,31 @@ export type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking';
 const BREATH: Record<OrbState, number> = { idle: 2400, listening: 700, thinking: 1100, speaking: 420 };
 const SPIN: Record<OrbState, number> = { idle: 9000, listening: 5000, thinking: 1600, speaking: 4000 };
 const AMP: Record<OrbState, number> = { idle: 0.03, listening: 0.08, thinking: 0.05, speaking: 0.14 };
+/** With Reduce Motion on, the orb holds still and shows its state by how open the ring is. */
+const STILL_HOLE: Record<OrbState, number> = { idle: 1, listening: 0.92, thinking: 0.96, speaking: 0.84 };
 
 /**
  * The live-agent orb: a rotating gradient ring with a soft glow, Mibyan's "working" signal.
- * The hole "breathes" and the ring wobbles so it feels alive. Decorative only.
+ * The hole "breathes" and the ring wobbles so it feels alive. Decorative only: every state it
+ * shows is also spoken, sounded (earcons) or written next to it. Honors Reduce Motion.
  */
 export function Orb({ size = 160, state = 'idle' }: { size?: number; state?: OrbState }) {
   const c = useColors();
   const spin = useSharedValue(0);
   const breath = useSharedValue(0);
   const wobble = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      cancelAnimation(spin);
+      cancelAnimation(breath);
+      cancelAnimation(wobble);
+      spin.value = 0;
+      breath.value = 0;
+      wobble.value = 0;
+      return;
+    }
     spin.value = 0;
     spin.value = withRepeat(withTiming(360, { duration: SPIN[state], easing: Easing.linear }), -1, false);
     breath.value = withRepeat(
@@ -50,7 +64,7 @@ export function Orb({ size = 160, state = 'idle' }: { size?: number; state?: Orb
       cancelAnimation(breath);
       cancelAnimation(wobble);
     };
-  }, [state, spin, breath, wobble]);
+  }, [state, spin, breath, wobble, reduceMotion]);
 
   const amp = AMP[state];
 
@@ -61,12 +75,21 @@ export function Orb({ size = 160, state = 'idle' }: { size?: number; state?: Orb
     ],
   }));
   const ring = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }));
+  const still = reduceMotion ? STILL_HOLE[state] : 0;
   const glow = useAnimatedStyle(() => ({
     opacity: 0.35 + breath.value * 0.4,
     transform: [{ scale: 1.05 + breath.value * amp * 2 }],
   }));
   const hole = useAnimatedStyle(() => ({
-    transform: [{ scale: state === 'speaking' ? 0.92 - breath.value * 0.14 : 1 - breath.value * 0.05 }],
+    transform: [
+      {
+        scale: still
+          ? still
+          : state === 'speaking'
+            ? 0.92 - breath.value * 0.14
+            : 1 - breath.value * 0.05,
+      },
+    ],
   }));
 
   const r = size / 2;
