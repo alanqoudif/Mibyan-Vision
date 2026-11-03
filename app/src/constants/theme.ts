@@ -1,12 +1,14 @@
 /**
- * Mubayan Vision design tokens — visual language modelled on Meta AI:
- * airy white canvas, heavy type, soft grey surfaces, one blue accent and a gradient orb.
- * Touch targets stay ≥ 56pt for VoiceOver / TalkBack users.
+ * Mibyan Vision design tokens: the Mibyan language at its most legible.
+ * White canvas, ink type, soft grey wells, one blue accent and the live-agent orb.
+ * Vision is the one Mibyan product where the accent fills primary actions (strongest affordance).
+ * Every readable text colour meets 4.5:1 on background and surface in both modes (low-vision audience).
+ * Touch targets stay ≥ 56pt for VoiceOver / TalkBack users; text scales up to 2× with the OS setting.
  */
 
 import '@/global.css';
 
-import { Platform, useColorScheme } from 'react-native';
+import { Platform, useColorScheme, useWindowDimensions } from 'react-native';
 
 const light = {
   background: '#FFFFFF',
@@ -15,13 +17,14 @@ const light = {
   card: '#FFFFFF',
   border: '#E4E8EE',
   text: '#0A1317',
-  textSecondary: '#65717C',
-  textTertiary: '#A7B0B9',
-  accent: '#0064E0',
+  textSecondary: '#55606A', // 6.4:1 on background, 5.8:1 on surface
+  textTertiary: '#5E6973', // 5.6:1 on background, 5.1:1 on surface (was 2.2:1)
+  accent: '#0064E0', // 5.4:1 with white text
   onAccent: '#FFFFFF',
   stop: '#FFE1E6',
-  stopText: '#E4153B',
-  success: '#1FA855',
+  stopText: '#C2122F', // 5.0:1 on stop, 6.0:1 on background (was 3.8:1 on stop)
+  success: '#1E8A47',
+  onSuccess: '#FFFFFF', // 4.4:1, used for large glyphs only
   shadow: '#0A1317',
 };
 
@@ -33,12 +36,14 @@ const dark: typeof light = {
   border: '#23272D',
   text: '#F5F7F9',
   textSecondary: '#9AA4AE',
-  textTertiary: '#5B646D',
-  accent: '#3D8BFF',
-  onAccent: '#FFFFFF',
+  textTertiary: '#8B949E', // 6.8:1 on background, 5.7:1 on surface (was 3.5:1)
+  // Lighter fill with ink text: 8.2:1. White on the old #3D8BFF was only 3.3:1.
+  accent: '#6FB0F0',
+  onAccent: '#0A1317',
   stop: '#3A1219',
   stopText: '#FF6B81',
   success: '#34D17A',
+  onSuccess: '#0A1317', // 9.4:1; white on this green was 2.0:1
   shadow: '#000000',
 };
 
@@ -49,7 +54,7 @@ export function useColors(): Palette {
   return useColorScheme() === 'dark' ? dark : light;
 }
 
-/** The Meta‑style orb gradient: blue → cyan → violet. */
+/** The live-agent orb gradient: Vision blue → cyan → violet. */
 export const OrbColors = ['#0064E0', '#00C6FF', '#7B61FF', '#C04BFF', '#0064E0'] as const;
 
 export const Fonts = Platform.select({
@@ -81,8 +86,21 @@ export const Type = {
   heading: { fontSize: 18, fontWeight: '600', lineHeight: 26 },
   body: { fontSize: 17, fontWeight: '400', lineHeight: 26 },
   spoken: { fontSize: 22, fontWeight: '400', lineHeight: 34 },
-  caption: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  caption: { fontSize: 15, fontWeight: '500', lineHeight: 22 },
 } as const;
 
 export const MinTouch = 56;
+/** Dynamic Type ceiling. Low-vision users need room to grow; never cap below 2. */
+export const MaxFontScale = 2;
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+
+/**
+ * Size for big decorative graphics (orb, compass dial, direction arrow). When the user's text is
+ * large, or the screen is short, the graphic gives its room back to the words around it.
+ */
+export function useGraphicSize(base: number): number {
+  const { fontScale, height } = useWindowDimensions();
+  const byText = Math.min(Math.max(fontScale, 1), 1.6);
+  const byHeight = Math.min(1, height / 844);
+  return Math.round((base * byHeight) / byText);
+}

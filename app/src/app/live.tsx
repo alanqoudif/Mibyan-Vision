@@ -14,7 +14,13 @@ import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CameraPreview } from '@/components/camera-preview';
@@ -538,9 +544,11 @@ export default function LiveScreen() {
 function LiveChip({ paused, label }: { paused: boolean; label: string }) {
   const c = useColors();
   const pulse = useSharedValue(1);
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
-    pulse.value = paused ? 1 : withRepeat(withTiming(0.25, { duration: 800 }), -1, true);
-  }, [paused, pulse]);
+    // The word next to the dot already says live or paused; with Reduce Motion the dot stays solid.
+    pulse.value = paused || reduceMotion ? 1 : withRepeat(withTiming(0.25, { duration: 800 }), -1, true);
+  }, [paused, pulse, reduceMotion]);
   const dot = useAnimatedStyle(() => ({ opacity: pulse.value }));
   return (
     <View style={[styles.chip, { backgroundColor: paused ? c.surface : 'rgba(255,59,48,0.12)' }]}>
@@ -565,7 +573,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    height: 36,
+    minHeight: 36,
+    paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
     borderRadius: Radius.full,
   },
@@ -585,7 +594,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one + 2,
     paddingHorizontal: Spacing.two + 2,
-    height: 28,
+    minHeight: 28,
+    paddingVertical: Spacing.half,
     borderRadius: Radius.full,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
@@ -601,7 +611,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
     minWidth: 200,
-    height: 60,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.five,
     borderRadius: Radius.full,
   },

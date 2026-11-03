@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { Radius, Spacing, useColors, useGraphicSize } from '@/constants/theme';
 import { transcribe } from '@/lib/assist';
 import { addEmergency, contactFromSpeech } from '@/lib/emergency';
 import { useI18n } from '@/lib/i18n';
@@ -27,6 +27,7 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
+  const orbSize = useGraphicSize(200);
   const { settings, update } = useSettings();
   const { t, lang, dir, speechLang } = useI18n();
   const { listen, cancel } = useListen();
@@ -132,7 +133,7 @@ export default function WelcomeScreen() {
         },
       ]}>
       <View style={styles.center} accessible accessibilityLiveRegion="polite" accessibilityLabel={line}>
-        <Orb size={200} state={orb} />
+        <Orb size={orbSize} state={orb} />
         <Text variant="spoken" center>
           {line}
         </Text>

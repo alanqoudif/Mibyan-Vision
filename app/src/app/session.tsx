@@ -20,7 +20,7 @@ import { CameraPreview } from '@/components/camera-preview';
 import { CircleButton } from '@/components/chrome';
 import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { Radius, Spacing, useColors, useGraphicSize } from '@/constants/theme';
 import { parseTags, splitAnswer, streamAssist, visibleText, type AssistRequest, type Turn } from '@/lib/assist';
 import { matchCommand, matchMode, matchRoute } from '@/lib/commands';
 import { dial, phoneIn } from '@/lib/emergency';
@@ -29,6 +29,7 @@ import { FACES_ALLOWED, addFace, faceRefs } from '@/lib/faces';
 import { checkFrame } from '@/lib/framing';
 import { contactIn } from '@/lib/helper';
 import { captureFromGlasses, stopGlasses, takeGlassesNotice } from '@/lib/glasses';
+import { useAnnounce } from '@/lib/a11y';
 import { useI18n } from '@/lib/i18n';
 import { prepareMic } from '@/lib/listen';
 import { addMed, medRefs } from '@/lib/meds';
@@ -73,6 +74,8 @@ export default function SessionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
+  const orbLarge = useGraphicSize(170);
+  const orbSmall = useGraphicSize(110);
   const { settings } = useSettings();
   const { t, lang, dir, speechLang } = useI18n();
   const prompt = modeText(mode, lang).prompt;
@@ -108,6 +111,9 @@ export default function SessionScreen() {
   const [spokenUpTo, setSpokenUpTo] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  // Written-only errors (mic permission, mic failure) would otherwise be silent for VoiceOver users;
+  // the network error already has its own spoken line.
+  useAnnounce(error && error !== t.errNetwork ? error : null);
 
   const alive = useRef(true);
   const gen = useRef(0); // bumps on every new turn so stale speech callbacks are ignored
@@ -587,7 +593,11 @@ export default function SessionScreen() {
       onMagicTap={onOrbPress}>
       <View style={styles.topBar}>
         <CircleButton icon="xmark" label={t.close} onPress={close} />
-        <Text variant="caption" tone="secondary" accessibilityLabel={t.duration(elapsed)}>
+        <Text
+          variant="caption"
+          tone="secondary"
+          accessibilityLabel={t.duration(elapsed)}
+          style={{ fontVariant: ['tabular-nums'] }}>
           {mm}:{ss}
         </Text>
         <View style={[styles.cam, { backgroundColor: c.surface }]} accessible accessibilityLabel={t.cameraOn}>
@@ -614,8 +624,11 @@ export default function SessionScreen() {
                 ? t.tapToTalk
                 : t.retake
         }
+        // The current state ("Listening…", "Thinking…") is read when focus lands here.
+        accessibilityValue={STATUS[phase] ? { text: STATUS[phase] } : undefined}
+        accessibilityState={{ busy }}
         style={styles.orbWrap}>
-        <Orb size={answer ? 110 : 170} state={ORB[phase]} />
+        <Orb size={answer ? orbSmall : orbLarge} state={ORB[phase]} />
         {!!STATUS[phase] && (
           <Text variant="heading" tone="secondary" center accessibilityLiveRegion="polite">
             {STATUS[phase]}
@@ -640,7 +653,7 @@ export default function SessionScreen() {
           </Text>
         )}
         {!!error && (
-          <Text variant="body" style={{ color: c.stopText }}>
+          <Text variant="body" accessibilityLiveRegion="polite" style={{ color: c.stopText }}>
             {error}
           </Text>
         )}
@@ -722,7 +735,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  liveDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
+  liveDot: { position: 'absolute', top: 6, end: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
   orbWrap: { alignItems: 'center', paddingTop: Spacing.two, gap: Spacing.one },
   transcript: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.four, gap: Spacing.three },
   bubble: {
@@ -740,7 +753,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
     minWidth: 200,
-    height: 60,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.five,
     borderRadius: Radius.full,
   },

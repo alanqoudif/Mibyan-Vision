@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CircleButton } from '@/components/chrome';
+import { CircleButton, IconAction } from '@/components/chrome';
 import { Text } from '@/components/text';
 import { Radius, Spacing, useColors } from '@/constants/theme';
 import * as Earcons from '@/lib/earcons';
 import { createInvite, removeContact, spokenCode, useContacts } from '@/lib/helper';
+import { useAnnounce } from '@/lib/a11y';
 import { useI18n } from '@/lib/i18n';
 import { SPEECH_RATE, useSettings } from '@/lib/settings';
 import * as Voice from '@/lib/voice';
@@ -27,6 +28,7 @@ export default function ContactsScreen() {
   const contacts = useContacts();
   const [invite, setInvite] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useAnnounce(error);
 
   const say = (text: string) => Voice.speakNow(text, { language: speechLang, rate: SPEECH_RATE[settings.speed] });
 
@@ -69,20 +71,19 @@ export default function ContactsScreen() {
                   </Text>
                 )}
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t.contactCall(p.name)}
-                hitSlop={8}
-                onPress={() => router.replace({ pathname: '/helper', params: { notify: String(p.id) } })}>
-                <SymbolView name="video.fill" size={22} tintColor={c.text} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t.contactRemove(p.name)}
-                hitSlop={8}
-                onPress={() => removeContact(p.id).catch(() => setError(t.errNetwork))}>
-                <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-              </Pressable>
+              <IconAction
+                icon="video.fill"
+                label={t.contactCall(p.name)}
+                color={c.text}
+                onPress={() => router.replace({ pathname: '/helper', params: { notify: String(p.id) } })}
+              />
+              <IconAction
+                icon="trash"
+                label={t.contactRemove(p.name)}
+                color={c.textSecondary}
+                size={20}
+                onPress={() => removeContact(p.id).catch(() => setError(t.errNetwork))}
+              />
             </View>
           ))
         )}
@@ -103,7 +104,11 @@ export default function ContactsScreen() {
             </Text>
           </View>
         )}
-        {!!error && <Text style={{ color: c.stopText }}>{error}</Text>}
+        {!!error && (
+          <Text accessibilityLiveRegion="polite" style={{ color: c.stopText }}>
+            {error}
+          </Text>
+        )}
 
         <Pressable
           accessibilityRole="button"
@@ -136,7 +141,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.two,
-    height: 60,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.four,
     borderRadius: Radius.full,
   },
 });

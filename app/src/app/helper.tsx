@@ -16,6 +16,7 @@ import { Radius, Spacing, useColors } from '@/constants/theme';
 import * as Earcons from '@/lib/earcons';
 import { captureFromGlasses, stopGlasses, takeGlassesNotice } from '@/lib/glasses';
 import { HelperEnded, formatCode, sendFrame, spokenCode, startSharing, stopSharing } from '@/lib/helper';
+import { useAnnounce } from '@/lib/a11y';
 import { useI18n } from '@/lib/i18n';
 import { SPEECH_RATE, useSettings } from '@/lib/settings';
 import * as Voice from '@/lib/voice';
@@ -48,6 +49,7 @@ export default function HelperScreen() {
   const [joined, setJoined] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [failed, setFailed] = useState(false);
+  useAnnounce(failed ? t.errNetwork : null);
 
   const alive = useRef(true);
   const codeRef = useRef<string | null>(null);
@@ -158,7 +160,9 @@ export default function HelperScreen() {
     <View style={[styles.root, { backgroundColor: c.background, direction: dir, paddingTop: insets.top + Spacing.two }]}>
       <View style={styles.topBar}>
         <CircleButton icon="xmark" label={t.helperEnd} onPress={close} />
-        <Text variant="heading">{t.helperTitle}</Text>
+        <Text variant="heading" accessibilityRole="header">
+          {t.helperTitle}
+        </Text>
         <View style={[styles.cam, { backgroundColor: c.surface }]} accessible accessibilityLabel={t.cameraOn}>
           <CameraPreview
             cameraRef={cameraRef}
@@ -200,7 +204,7 @@ export default function HelperScreen() {
         </Pressable>
 
         {failed && (
-          <Text variant="body" style={{ color: c.stopText }}>
+          <Text variant="body" accessibilityLiveRegion="polite" style={{ color: c.stopText }}>
             {t.errNetwork}
           </Text>
         )}
@@ -259,7 +263,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
     minWidth: 200,
-    height: 60,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.five,
     borderRadius: Radius.full,
   },

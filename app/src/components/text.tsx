@@ -1,6 +1,6 @@
 import { Text as RNText, type TextProps } from 'react-native';
 
-import { Type, useColors } from '@/constants/theme';
+import { MaxFontScale, Type, useColors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
 
 type Variant = keyof typeof Type;
@@ -19,7 +19,7 @@ export function Text({
   const align = center ? 'center' : dir === 'rtl' ? 'right' : 'left';
   return (
     <RNText
-      maxFontSizeMultiplier={1.6}
+      maxFontSizeMultiplier={MaxFontScale}
       style={[Type[variant], { color, writingDirection: dir, textAlign: align }, style]}
       {...rest}
     />

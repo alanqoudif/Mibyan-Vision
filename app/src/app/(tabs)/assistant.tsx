@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { IconAction } from '@/components/chrome';
 import { Divider, Section, Segmented, ToggleRow, rows } from '@/components/settings-rows';
 import { Text } from '@/components/text';
-import { BottomTabInset, Radius, Spacing, useColors } from '@/constants/theme';
+import { BottomTabInset, MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
+import { useAnnounce } from '@/lib/a11y';
 import * as Earcons from '@/lib/earcons';
 import { EMERGENCY_SERVICES, addEmergency, cleanPhone, dial, removeEmergency, useEmergency } from '@/lib/emergency';
 import { FACES_ALLOWED, removeFace, useFaces } from '@/lib/faces';
@@ -215,13 +217,13 @@ export default function AssistantScreen() {
                         </Text>
                       )}
                     </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t.medRemove(m.name)}
-                      hitSlop={8}
-                      onPress={() => removeMed(m.id)}>
-                      <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-                    </Pressable>
+                    <IconAction
+                      icon="trash"
+                      label={t.medRemove(m.name)}
+                      color={c.textSecondary}
+                      size={20}
+                      onPress={() => removeMed(m.id)}
+                    />
                   </View>
                 </View>
               ))
@@ -256,13 +258,13 @@ export default function AssistantScreen() {
                           {m.note} · {m.kind === 'remember' ? t.memoryRemembered : t.memorySeen} {ago(m.at, lang)}
                         </Text>
                       </View>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={t.memoryForget(m.label)}
-                        hitSlop={8}
-                        onPress={() => forget(m.id)}>
-                        <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-                      </Pressable>
+                      <IconAction
+                        icon="trash"
+                        label={t.memoryForget(m.label)}
+                        color={c.textSecondary}
+                        size={20}
+                        onPress={() => forget(m.id)}
+                      />
                     </View>
                   </View>
                 ))}
@@ -301,13 +303,13 @@ export default function AssistantScreen() {
                         <Text variant="heading" style={{ flex: 1 }}>
                           {f.name}
                         </Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={t.faceRemove(f.name)}
-                          hitSlop={8}
-                          onPress={() => removeFace(f.id)}>
-                          <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-                        </Pressable>
+                        <IconAction
+                          icon="trash"
+                          label={t.faceRemove(f.name)}
+                          color={c.textSecondary}
+                          size={20}
+                          onPress={() => removeFace(f.id)}
+                        />
                       </View>
                     </View>
                   ))
@@ -405,6 +407,7 @@ function EmergencySection() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState(false);
+  useAnnounce(error ? t.emergencyInvalid : null);
   const align = { textAlign: dir === 'rtl' ? 'right' : 'left', writingDirection: dir } as const;
 
   const save = () => {
@@ -439,7 +442,7 @@ function EmergencySection() {
               onPress={() => dial(e.phone)}
               style={styles.callArea}>
               <View style={[styles.callIcon, { backgroundColor: c.success }]}>
-                <SymbolView name="phone.fill" size={20} tintColor="#FFFFFF" />
+                <SymbolView name="phone.fill" size={20} tintColor={c.onSuccess} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text variant="heading">{e.name}</Text>
@@ -451,13 +454,13 @@ function EmergencySection() {
                 </Text>
               </View>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t.emergencyRemove(e.name)}
-              hitSlop={8}
-              onPress={() => removeEmergency(e.id)}>
-              <SymbolView name="trash" size={20} tintColor={c.textSecondary} />
-            </Pressable>
+            <IconAction
+              icon="trash"
+              label={t.emergencyRemove(e.name)}
+              color={c.textSecondary}
+              size={20}
+              onPress={() => removeEmergency(e.id)}
+            />
           </View>
         </View>
       ))}
@@ -469,7 +472,7 @@ function EmergencySection() {
         onPress={() => dial(EMERGENCY_SERVICES)}
         style={rows.row}>
         <View style={[styles.callIcon, { backgroundColor: c.stopText }]}>
-          <SymbolView name="cross.case.fill" size={20} tintColor="#FFFFFF" />
+          <SymbolView name="cross.case.fill" size={20} tintColor={c.background} />
         </View>
         <View style={{ flex: 1 }}>
           <Text variant="heading">{t.emergencyServices}</Text>
@@ -515,7 +518,11 @@ function EmergencySection() {
             onSubmitEditing={save}
             style={[styles.input, align, { color: c.text, backgroundColor: c.surface }]}
           />
-          {error && <Text style={{ color: c.stopText }}>{t.emergencyInvalid}</Text>}
+          {error && (
+            <Text accessibilityLiveRegion="polite" style={{ color: c.stopText }}>
+              {t.emergencyInvalid}
+            </Text>
+          )}
           <Pressable
             accessibilityRole="button"
             onPress={save}
@@ -543,8 +550,8 @@ const styles = StyleSheet.create({
   callArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   callIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: { minHeight: 44, paddingHorizontal: Spacing.three, borderRadius: Radius.full, justifyContent: 'center' },
-  input: { minHeight: 52, borderRadius: Radius.sm, paddingHorizontal: Spacing.three, fontSize: 17 },
+  chip: { minHeight: MinTouch, paddingHorizontal: Spacing.three, borderRadius: Radius.full, justifyContent: 'center' },
+  input: { minHeight: MinTouch, borderRadius: Radius.sm, paddingHorizontal: Spacing.three, fontSize: 17 },
   more: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -553,5 +560,5 @@ const styles = StyleSheet.create({
     minHeight: 56,
     borderRadius: Radius.md,
   },
-  pill: { height: 56, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  pill: { minHeight: MinTouch, paddingVertical: Spacing.two, paddingHorizontal: Spacing.four, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
 });

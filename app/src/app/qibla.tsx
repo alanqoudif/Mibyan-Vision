@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CircleButton } from '@/components/chrome';
 import { Text } from '@/components/text';
-import { Spacing, Radius, useColors } from '@/constants/theme';
+import { Spacing, Radius, useColors, useGraphicSize } from '@/constants/theme';
 import * as Earcons from '@/lib/earcons';
 import { useI18n } from '@/lib/i18n';
 import { currentPosition } from '@/lib/place';
@@ -37,6 +37,7 @@ export default function QiblaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
+  const dialSize = useGraphicSize(200);
   const { settings } = useSettings();
   const { t, dir, speechLang } = useI18n();
 
@@ -202,17 +203,22 @@ export default function QiblaScreen() {
       </View>
 
       <View style={styles.center} accessible accessibilityLiveRegion="polite" accessibilityLabel={status}>
-        <View style={[styles.dial, { backgroundColor: found ? c.success : c.surface }]}>
+        <View
+          style={[
+            styles.dial,
+            { width: dialSize, height: dialSize, borderRadius: dialSize / 2 },
+            { backgroundColor: found ? c.success : c.surface },
+          ]}>
           {/* The arrow points at the qibla relative to the top of the phone. */}
           <View style={{ transform: [{ rotate: `${delta ?? 0}deg` }] }}>
-            <SymbolView name="location.north.fill" size={110} tintColor={found ? '#FFFFFF' : c.text} weight="bold" />
+            <SymbolView name="location.north.fill" size={Math.round(dialSize * 0.55)} tintColor={found ? c.onSuccess : c.text} weight="bold" />
           </View>
         </View>
         <Text variant="title" center>
           {status}
         </Text>
         {delta !== null && !found && (
-          <Text variant="heading" tone="secondary" center>
+          <Text variant="heading" tone="secondary" center style={{ fontVariant: ['tabular-nums'] }}>
             {t.qiblaDegrees(Math.round(Math.abs(delta)), delta >= 0)}
           </Text>
         )}
@@ -303,7 +309,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
     minWidth: 200,
-    height: 60,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.five,
     borderRadius: Radius.full,
   },

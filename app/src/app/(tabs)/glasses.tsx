@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Section, Segmented, rows } from '@/components/settings-rows';
 import { Text } from '@/components/text';
-import { BottomTabInset, OrbColors, Radius, Spacing, useColors } from '@/constants/theme';
+import { BottomTabInset, MinTouch, OrbColors, Radius, Spacing, useColors } from '@/constants/theme';
 import { useGlasses, type GlassesStatus } from '@/lib/glasses';
 import { useI18n } from '@/lib/i18n';
 import { useSettings, type Settings } from '@/lib/settings';
@@ -45,7 +45,7 @@ export default function GlassesScreen() {
         {t.devices}
       </Text>
 
-      {/* Device hero, modelled after Meta AI's Devices card */}
+      {/* Device hero for the paired glasses */}
       <View
         style={[styles.device, { backgroundColor: c.card, shadowColor: c.shadow }]}
         accessible
@@ -132,7 +132,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
-    height: 32,
+    minHeight: 32,
+    paddingVertical: Spacing.one,
     borderRadius: Radius.full,
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
@@ -144,5 +145,5 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: Radius.sm,
   },
-  connect: { minHeight: 52, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  connect: { minHeight: MinTouch, paddingVertical: Spacing.two, paddingHorizontal: Spacing.four, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
 });
