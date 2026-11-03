@@ -9,12 +9,13 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
+      "buildNumber": "3",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "مبيان فيجن يحتاج المايك عشان تكلم المساعد.",
         "NSBluetoothAlwaysUsageDescription": "مبيان فيجن يتصل بالنظارة عبر البلوتوث.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.mubayan.vision"
+      "bundleIdentifier": "com.mubayan.mibyanvision"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,7 +30,11 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -93,7 +98,8 @@
             "Mubayan"
           ]
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -106,9 +112,9 @@
         }
       },
       "eas": {
-        "projectId": "99fbfd91-a4b6-454a-98ab-15eb7d940cb3"
+        "projectId": "103efad3-da41-440c-9eae-1e52142d07af"
       }
     },
-    "owner": "faisal619"
+    "owner": "falah_11"
   }
 }

@@ -9,5 +9,12 @@
       "distribution": "internal",
       "ios": { "image": "latest" }
     }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6827024673"
+      }
+    }
   }
 }

@@ -1,0 +1,70 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.3.1 effective-5.10 (swiftlang-6.3.1.1.2 clang-2100.0.123.102)
+// swift-module-flags: -target arm64-apple-ios16.4 -enable-objc-interop -enable-library-evolution -swift-version 5 -O -enable-upcoming-feature LibraryEvolution -enable-experimental-feature DebugDescriptionMacro -module-name ExpoCamera -package-name expocamera
+// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.3.1
+@_exported @preconcurrency import AVFoundation
+import CoreImage
+import CoreMotion
+@preconcurrency import ExpoModulesCore
+@_exported @preconcurrency import Foundation
+import PDFKit
+import Swift
+@_exported @preconcurrency import UIKit
+import Vision
+import VisionKit
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+@_inheritsConvenienceInitializers final public class CameraViewModule : ExpoModulesCore.Module {
+  final public func definition() -> ExpoModulesCore.ModuleDefinition
+  required public init(appContext: ExpoModulesCore.AppContext)
+  @objc deinit
+}
+public struct BarcodeUtils {
+  public static func addEmptyCornerPoints(to result: inout [Swift.String : Any])
+}
+public enum BarcodeType : Swift.String, ExpoModulesCore.Enumerable {
+  case aztec
+  case ean13
+  case ean8
+  case qr
+  case pdf417
+  case upc_e
+  case datamatrix
+  case code39
+  case code93
+  case itf14
+  case codabar
+  case code128
+  case upc_a
+  public static func toBarcodeType(type: AVFoundation.AVMetadataObject.ObjectType) -> ExpoCamera.BarcodeType
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [ExpoCamera.BarcodeType]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [ExpoCamera.BarcodeType] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+@objc @_hasMissingDesignatedInitializers @_Concurrency.MainActor @preconcurrency public class CameraView : ExpoModulesCore.ExpoView, ExpoModulesCore.EXAppLifecycleListener, ExpoModulesCore.EXCameraInterface {
+  @_Concurrency.MainActor @preconcurrency @objc public var sessionQueue: Dispatch.DispatchQueue
+  @_Concurrency.MainActor @preconcurrency @objc public var session: AVFoundation.AVCaptureSession!
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public class var layerClass: Swift.AnyClass {
+    @objc get
+  }
+  @_Concurrency.MainActor @preconcurrency @objc public func onAppForegrounded()
+  @_Concurrency.MainActor @preconcurrency @objc public func onAppBackgrounded()
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public func didMoveToWindow()
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public func removeFromSuperview()
+  @objc deinit
+}
+@objc public protocol ExpoBarcodeScannerProvider {
+  @objc var supportedTypes: [Swift.String] { get }
+  @objc func scanBarcodes(from image: CoreGraphics.CGImage) -> [[Swift.String : Any]]
+}
+extension ExpoCamera.BarcodeType : Swift.Equatable {}
+extension ExpoCamera.BarcodeType : Swift.Hashable {}
+extension ExpoCamera.BarcodeType : Swift.RawRepresentable {}
+extension ExpoCamera.CameraView : Swift.Sendable {}
