@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CircleButton } from '@/components/chrome';
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
 import {
   HelperEnded,
   acceptInvite,
@@ -302,11 +302,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   content: { padding: Spacing.four, gap: Spacing.three },
-  input: { minHeight: 52, borderRadius: Radius.md, paddingHorizontal: Spacing.three, fontSize: 17 },
+  input: { minHeight: MinTouch, borderRadius: Radius.md, paddingHorizontal: Spacing.three, fontSize: 17 },
   codeInput: { fontSize: 28, letterSpacing: 4, textAlign: 'center' },
   frame: { aspectRatio: 3 / 4, borderRadius: Radius.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   quick: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: { paddingHorizontal: Spacing.three, minHeight: 44, borderRadius: Radius.full, justifyContent: 'center' },
+  chip: { paddingHorizontal: Spacing.three, minHeight: MinTouch, borderRadius: Radius.full, justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  pill: { height: 56, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  pill: { minHeight: MinTouch, paddingVertical: Spacing.two, paddingHorizontal: Spacing.four, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
 });

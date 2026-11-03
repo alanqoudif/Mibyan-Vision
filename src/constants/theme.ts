@@ -8,7 +8,7 @@
 
 import '@/global.css';
 
-import { Platform, useColorScheme } from 'react-native';
+import { Platform, useColorScheme, useWindowDimensions } from 'react-native';
 
 const light = {
   background: '#FFFFFF',
@@ -93,3 +93,14 @@ export const MinTouch = 56;
 /** Dynamic Type ceiling. Low-vision users need room to grow; never cap below 2. */
 export const MaxFontScale = 2;
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+
+/**
+ * Size for big decorative graphics (orb, compass dial, direction arrow). When the user's text is
+ * large, or the screen is short, the graphic gives its room back to the words around it.
+ */
+export function useGraphicSize(base: number): number {
+  const { fontScale, height } = useWindowDimensions();
+  const byText = Math.min(Math.max(fontScale, 1), 1.6);
+  const byHeight = Math.min(1, height / 844);
+  return Math.round((base * byHeight) / byText);
+}

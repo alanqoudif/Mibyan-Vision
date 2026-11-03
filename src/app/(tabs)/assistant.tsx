@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Divider, Section, Segmented, ToggleRow, rows } from '@/components/settings-rows';
 import { Text } from '@/components/text';
-import { BottomTabInset, Radius, Spacing, useColors } from '@/constants/theme';
+import { BottomTabInset, MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
 import * as Earcons from '@/lib/earcons';
 import { EMERGENCY_SERVICES, addEmergency, cleanPhone, dial, removeEmergency, useEmergency } from '@/lib/emergency';
 import { FACES_ALLOWED, removeFace, useFaces } from '@/lib/faces';
@@ -529,8 +529,8 @@ const styles = StyleSheet.create({
   callArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   callIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: { minHeight: 44, paddingHorizontal: Spacing.three, borderRadius: Radius.full, justifyContent: 'center' },
-  input: { minHeight: 52, borderRadius: Radius.sm, paddingHorizontal: Spacing.three, fontSize: 17 },
+  chip: { minHeight: MinTouch, paddingHorizontal: Spacing.three, borderRadius: Radius.full, justifyContent: 'center' },
+  input: { minHeight: MinTouch, borderRadius: Radius.sm, paddingHorizontal: Spacing.three, fontSize: 17 },
   more: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -539,5 +539,5 @@ const styles = StyleSheet.create({
     minHeight: 56,
     borderRadius: Radius.md,
   },
-  pill: { height: 56, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  pill: { minHeight: MinTouch, paddingVertical: Spacing.two, paddingHorizontal: Spacing.four, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
 });

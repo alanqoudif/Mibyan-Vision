@@ -13,7 +13,7 @@ import { CameraPreview } from '@/components/camera-preview';
 import { CircleButton } from '@/components/chrome';
 import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { Radius, Spacing, useColors, useGraphicSize } from '@/constants/theme';
 import { splitAnswer, streamAssist } from '@/lib/assist';
 import * as Earcons from '@/lib/earcons';
 import { captureFromGlasses, stopGlasses, takeGlassesNotice } from '@/lib/glasses';
@@ -54,6 +54,8 @@ export default function FindScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
+  const arrowSize = useGraphicSize(180);
+  const orbSize = useGraphicSize(170);
   const { settings } = useSettings();
   const { t, lang, dir, speechLang } = useI18n();
   const { listen, cancel } = useListen();
@@ -313,11 +315,16 @@ export default function FindScreen() {
 
       <View style={styles.center} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${status}. ${hint}`}>
         {phase === 'searching' ? (
-          <View style={[styles.arrow, { backgroundColor: pos === 'ahead' ? c.success : c.surface }]}>
-            <SymbolView name={ICON[pos]} size={96} tintColor={pos === 'ahead' ? c.onSuccess : c.text} weight="bold" />
+          <View
+            style={[
+              styles.arrow,
+              { width: arrowSize, height: arrowSize, borderRadius: arrowSize / 2 },
+              { backgroundColor: pos === 'ahead' ? c.success : c.surface },
+            ]}>
+            <SymbolView name={ICON[pos]} size={Math.round(arrowSize * 0.53)} tintColor={pos === 'ahead' ? c.onSuccess : c.text} weight="bold" />
           </View>
         ) : (
-          <Orb size={170} state={orb} />
+          <Orb size={orbSize} state={orb} />
         )}
         <Text variant="title" center>
           {status}
@@ -408,7 +415,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
     minWidth: 200,
-    height: 60,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.five,
     borderRadius: Radius.full,
   },

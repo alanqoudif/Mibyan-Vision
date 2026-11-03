@@ -2,7 +2,7 @@ import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
 
 /** Grouped settings building blocks shared by the Assistant and Glasses tabs. */
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -114,7 +114,8 @@ export const rows = StyleSheet.create({
   },
   segmentItem: {
     flex: 1,
-    minHeight: 44,
+    minHeight: MinTouch - 6, // the 3pt track padding on each side brings the target to 56
+    paddingVertical: Spacing.one,
     borderRadius: Radius.sm - 3,
     alignItems: 'center',
     justifyContent: 'center',

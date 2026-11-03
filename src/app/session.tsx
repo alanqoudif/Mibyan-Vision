@@ -20,7 +20,7 @@ import { CameraPreview } from '@/components/camera-preview';
 import { CircleButton } from '@/components/chrome';
 import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { Radius, Spacing, useColors, useGraphicSize } from '@/constants/theme';
 import { parseTags, splitAnswer, streamAssist, visibleText, type AssistRequest, type Turn } from '@/lib/assist';
 import { matchCommand, matchMode, matchRoute } from '@/lib/commands';
 import { dial, phoneIn } from '@/lib/emergency';
@@ -73,6 +73,8 @@ export default function SessionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = useColors();
+  const orbLarge = useGraphicSize(170);
+  const orbSmall = useGraphicSize(110);
   const { settings } = useSettings();
   const { t, lang, dir, speechLang } = useI18n();
   const prompt = modeText(mode, lang).prompt;
@@ -582,7 +584,11 @@ export default function SessionScreen() {
       onMagicTap={onOrbPress}>
       <View style={styles.topBar}>
         <CircleButton icon="xmark" label={t.close} onPress={close} />
-        <Text variant="caption" tone="secondary" accessibilityLabel={t.duration(elapsed)}>
+        <Text
+          variant="caption"
+          tone="secondary"
+          accessibilityLabel={t.duration(elapsed)}
+          style={{ fontVariant: ['tabular-nums'] }}>
           {mm}:{ss}
         </Text>
         <View style={[styles.cam, { backgroundColor: c.surface }]} accessible accessibilityLabel={t.cameraOn}>
@@ -610,7 +616,7 @@ export default function SessionScreen() {
                 : t.retake
         }
         style={styles.orbWrap}>
-        <Orb size={answer ? 110 : 170} state={ORB[phase]} />
+        <Orb size={answer ? orbSmall : orbLarge} state={ORB[phase]} />
         {!!STATUS[phase] && (
           <Text variant="heading" tone="secondary" center accessibilityLiveRegion="polite">
             {STATUS[phase]}
@@ -735,7 +741,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
     minWidth: 200,
-    height: 60,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.five,
     borderRadius: Radius.full,
   },

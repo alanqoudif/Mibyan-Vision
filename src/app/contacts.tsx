@@ -136,7 +136,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.two,
-    height: 60,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.four,
     borderRadius: Radius.full,
   },
 });
