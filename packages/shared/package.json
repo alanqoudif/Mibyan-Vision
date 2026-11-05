@@ -3,5 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": "./src/index.ts",
+    "./sense": "./src/sense/index.ts"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  }
 }
