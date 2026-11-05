@@ -36,16 +36,6 @@ export type Settings = {
   name: string;
   /** The first-launch voice setup has run (or was skipped). */
   onboarded: boolean;
-  /** Dark is the default experience. */
-  appearance: 'dark' | 'light' | 'system';
-  /** Experience chosen during onboarding; only recommends Senses, never restricts. */
-  experience: 'everyday' | 'accessibility' | 'work' | 'developer';
-  /** Sense ids the user picked as a starting profile. */
-  profileSenses: string[];
-  /** Phone-side screen-reader style output: speak Sense results aloud after a run. */
-  speakResults: boolean;
-  /** The new Sixth Sense onboarding has been completed. */
-  sixthOnboarded: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -67,11 +57,6 @@ const DEFAULTS: Settings = {
   voiceOver: true,
   name: '',
   onboarded: false,
-  appearance: 'dark',
-  experience: 'everyday',
-  profileSenses: [],
-  speakResults: true,
-  sixthOnboarded: false,
 };
 
 export const SPEECH_RATE: Record<Settings['speed'], number> = { slow: 0.85, normal: 1, fast: 1.2 };
