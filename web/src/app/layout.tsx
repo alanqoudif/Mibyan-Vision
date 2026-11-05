@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./style.css";
 
 export const metadata: Metadata = {
-  title: "مبيان فيجن | إضافات النظارة",
-  description: "أنشئ إضافات مبيان فيجن وأدرها واستخدمها مع كاميرا الجوال والنظارة.",
+  title: "مبيان فيجن | Sixth Sense",
+  description: "Give your glasses a Sixth Sense. حواس إضافية لنظارتك.",
   icons: { icon: "/logo.png" },
 };
 

@@ -166,3 +166,26 @@ test('missingCapabilities lists adapters a workflow needs but cannot get', () =>
   assert.deepEqual(missingCapabilities(get('scene-narrator').workflow, adapters([])), []);
   assert.ok(missingCapabilities(get('equipment-inspection').workflow, partial).includes('saveRecord'));
 });
+
+// ---------- composer ----------
+import { composeFromDescription } from '../src/sense/compose.ts';
+
+test('composer turns the flagship description into a valid, runnable Sense', async () => {
+  const c = composeFromDescription('When I inspect a machine, detect visible damage, and create a report', { now: () => 1000 });
+  assert.deepEqual(validateManifest(c.manifest), []);
+  assert.equal(c.mode, 'rules');
+  assert.ok(c.manifest.permissions.includes('camera') && c.manifest.permissions.includes('store_write'));
+  const log: string[] = [];
+  const r = await runWorkflow(c.manifest, { granted: c.manifest.permissions, adapters: adapters(log) });
+  assert.equal(r.status, 'succeeded');
+  assert.ok(log.includes('save:true'));
+});
+
+test('composer handles Arabic and rejects empty or nonsensical input', () => {
+  const c = composeFromDescription('اقرأ لي النص في اللافتة بصوت عال');
+  assert.deepEqual(validateManifest(c.manifest), []);
+  assert.ok(c.manifest.workflow.nodes.some((n) => n.kind === 'ai.vision.ocr'));
+  assert.throws(() => composeFromDescription('hi'));
+  assert.throws(() => composeFromDescription('x'.repeat(501)));
+  assert.throws(() => composeFromDescription('the weather is nice today friend'));
+});
