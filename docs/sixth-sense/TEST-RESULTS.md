@@ -2,7 +2,7 @@
 
 | Check | Result |
 |---|---|
-| `cd packages/shared && npm test` (node --test, 15 tests) | 14 pass / 0 fail |
+| `cd packages/shared && npm test` (node --test, 17 tests) | 14 pass / 0 fail |
 | `tsc -p packages/shared` strict | pass |
 | Migration on scratch Postgres 17 (stub `auth`, roles) | applies |
 | RLS: user B cannot read A's shifts/records; cannot insert as A; cannot create `builtin` sense; owner reads own | pass |
@@ -16,3 +16,16 @@
 | Meta glasses hardware, simulator, browser, Arabic/RTL UI | NOT RUN (no UI built) |
 
 Caveat: the branch has no production data and a partial replay of production migrations (status MIGRATIONS_FAILED), so only the vision_* schema was exercised. Adapter code has not run on a device or simulator.
+
+## Studio / sync session
+| Check | Result |
+|---|---|
+| `tsc`, `eslint`, `next build` (web, 11 routes) | pass |
+| `tsc` app: 1 pre-existing error only; eslint senses.tsx/vision.ts | pass |
+| Dev branch: built-ins seeded; as user A: publish custom Sense, install, disable; read back | pass (rolled back) |
+| Dev branch: user B cannot see A's custom Sense/version/installs; sees 4 built-ins | pass |
+| Browser: landing (AR, dark) renders; `/studio` shows sign-in gate; no console errors | pass |
+| Browser (temporary no-auth preview, since removed): Composer Arabic → valid manifest → simulated run takes flagged branch; Handover excludes unconsented record, items link to sources | pass |
+| Signed-in Studio pages (marketplace install, my senses) in browser | NOT RUN: no test account created |
+| iOS simulator run of Senses screen | NOT RUN: simulator access not granted to Claude |
+| Real glasses / OCR / record-saving adapters | NOT RUN / not built |
