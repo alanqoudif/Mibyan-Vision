@@ -40,6 +40,7 @@ export default function ToolsScreen() {
         <View style={{ width: 48 }} />
       </View>
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + Spacing.four }]}>
+        <Tool icon="sparkles" label={lang === 'ar' ? 'الحواس' : 'Senses'} onPress={() => router.push('/senses')} />
         <Tool icon="puzzlepiece.extension" label={t.manageTools} onPress={() => router.push('/plugins')} />
         {MODES.filter((m) => m.id !== 'ask' && settings.enabledTools.includes(m.id)).map((m) => (
           <Tool key={m.id} icon={m.icon} label={modeText(m, lang).title} onPress={() => open(m.id)} />
