@@ -1,8 +1,7 @@
 /**
  * Mibyan Vision design tokens: the Mibyan language at its most legible.
- * White canvas, ink type, soft grey wells, one blue accent and the live-agent orb.
- * Vision is the one Mibyan product where the accent fills primary actions (strongest affordance).
- * Every readable text colour meets 4.5:1 on background and surface in both modes (low-vision audience).
+ * Near-black canvas (default), graphite surfaces, electric-violet accent with a cyan edge.
+ *  * Every readable text colour meets 4.5:1 on background and surface in both modes (low-vision audience).
  * Touch targets stay ≥ 56pt for VoiceOver / TalkBack users; text scales up to 2× with the OS setting.
  */
 
@@ -10,52 +9,79 @@ import '@/global.css';
 
 import { Platform, useColorScheme, useWindowDimensions } from 'react-native';
 
+import { useSettings } from '@/lib/settings';
+
 const light = {
-  background: '#FFFFFF',
-  surface: '#F1F4F7',
-  surfaceStrong: '#E4E8EE',
+  background: '#F6F5FB',
+  surface: '#ECEAF5',
+  surfaceStrong: '#DDDAEC',
   card: '#FFFFFF',
-  border: '#E4E8EE',
-  text: '#0A1317',
-  textSecondary: '#55606A', // 6.4:1 on background, 5.8:1 on surface
-  textTertiary: '#5E6973', // 5.6:1 on background, 5.1:1 on surface (was 2.2:1)
-  accent: '#0064E0', // 5.4:1 with white text
+  border: '#E1DEEE',
+  text: '#0E0D18',
+  textSecondary: '#4D4B63', // 7.6:1 on background
+  textTertiary: '#5C5A72', // 6.0:1 on background, 5.2:1 on surface
+  accent: '#6D3FE0', // 6.1:1 with white text
+  accentText: '#5B2FCB', // 7.4:1 on background
   onAccent: '#FFFFFF',
-  stop: '#FFE1E6',
-  stopText: '#C2122F', // 5.0:1 on stop, 6.0:1 on background (was 3.8:1 on stop)
-  success: '#1E8A47',
-  onSuccess: '#FFFFFF', // 4.4:1, used for large glyphs only
-  shadow: '#0A1317',
+  stop: '#FFE3E8',
+  stopText: '#B4112D',
+  success: '#157A3E',
+  onSuccess: '#FFFFFF',
+  warning: '#9A5B00',
+  cyan: '#0A7E96',
+  sand: '#8A6B3A',
+  glow: '#8B5CF6',
+  shadow: '#1A1033',
 };
 
 const dark: typeof light = {
-  background: '#000000',
-  surface: '#16191D',
-  surfaceStrong: '#23272D',
-  card: '#101215',
-  border: '#23272D',
-  text: '#F5F7F9',
-  textSecondary: '#9AA4AE',
-  textTertiary: '#8B949E', // 6.8:1 on background, 5.7:1 on surface (was 3.5:1)
-  // Lighter fill with ink text: 8.2:1. White on the old #3D8BFF was only 3.3:1.
-  accent: '#6FB0F0',
-  onAccent: '#0A1317',
+  background: '#07070B',
+  surface: '#101018',
+  surfaceStrong: '#1B1B28',
+  card: '#13131C',
+  border: '#24243A',
+  text: '#F4F3FA',
+  textSecondary: '#A8A7BD', // 8.4:1 on background
+  textTertiary: '#8F8EA6', // 6.3:1 on background, 5.6:1 on surface
+  accent: '#7C4DEB', // 5.2:1 with white text
+  accentText: '#A78BFA', // 6.9:1 on surface
+  onAccent: '#FFFFFF',
   stop: '#3A1219',
-  stopText: '#FF6B81',
+  stopText: '#FF7A90',
   success: '#34D17A',
-  onSuccess: '#0A1317', // 9.4:1; white on this green was 2.0:1
+  onSuccess: '#07070B',
+  warning: '#F5B544',
+  cyan: '#38D5F0',
+  sand: '#D9C3A0',
+  glow: '#8B5CF6',
   shadow: '#000000',
 };
 
 export type Palette = typeof light;
 export const Palettes = { light, dark };
 
-export function useColors(): Palette {
-  return useColorScheme() === 'dark' ? dark : light;
+/** Dark is the default; "system" follows the OS. */
+export function useScheme(): 'light' | 'dark' {
+  const { settings } = useSettings();
+  const system = useColorScheme();
+  if (settings.appearance === 'system') return system === 'light' ? 'light' : 'dark';
+  return settings.appearance;
 }
 
-/** The live-agent orb gradient: Vision blue → cyan → violet. */
-export const OrbColors = ['#0064E0', '#00C6FF', '#7B61FF', '#C04BFF', '#0064E0'] as const;
+export function useColors(): Palette {
+  return Palettes[useScheme()];
+}
+
+/** The Sense Orb gradient: violet → indigo → cyan. */
+export const OrbColors = ['#7C4DEB', '#4F46E5', '#22D3EE', '#8B5CF6', '#7C4DEB'] as const;
+
+/** IBM Plex Sans Arabic covers Arabic and Latin, so one family serves both languages. */
+export const FontFamily = {
+  '400': 'IBMPlexSansArabic_400Regular',
+  '500': 'IBMPlexSansArabic_500Medium',
+  '600': 'IBMPlexSansArabic_600SemiBold',
+  '700': 'IBMPlexSansArabic_700Bold',
+} as const;
 
 export const Fonts = Platform.select({
   ios: { sans: 'system-ui', rounded: 'ui-rounded' },
@@ -77,19 +103,24 @@ export const Radius = {
   sm: 12,
   md: 18,
   lg: 26,
+  xl: 34,
   full: 999,
 } as const;
 
 export const Type = {
-  display: { fontSize: 32, fontWeight: '700', lineHeight: 42, letterSpacing: -0.4 },
-  title: { fontSize: 24, fontWeight: '700', lineHeight: 32 },
-  heading: { fontSize: 18, fontWeight: '600', lineHeight: 26 },
-  body: { fontSize: 17, fontWeight: '400', lineHeight: 26 },
-  spoken: { fontSize: 22, fontWeight: '400', lineHeight: 34 },
-  caption: { fontSize: 15, fontWeight: '500', lineHeight: 22 },
+  hero: { fontSize: 38, fontWeight: '700', lineHeight: 52, letterSpacing: -0.5 },
+  display: { fontSize: 32, fontWeight: '700', lineHeight: 44, letterSpacing: -0.3 },
+  title: { fontSize: 24, fontWeight: '700', lineHeight: 34 },
+  heading: { fontSize: 18, fontWeight: '600', lineHeight: 28 },
+  body: { fontSize: 17, fontWeight: '400', lineHeight: 28 },
+  spoken: { fontSize: 22, fontWeight: '400', lineHeight: 36 },
+  caption: { fontSize: 15, fontWeight: '500', lineHeight: 24 },
+  label: { fontSize: 13, fontWeight: '600', lineHeight: 20, letterSpacing: 0.2 },
 } as const;
 
 export const MinTouch = 56;
+/** Secondary controls never go below Apple's 44pt minimum. */
+export const SmallTouch = 44;
 /** Dynamic Type ceiling. Low-vision users need room to grow; never cap below 2. */
 export const MaxFontScale = 2;
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
