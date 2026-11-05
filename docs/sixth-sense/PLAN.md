@@ -19,7 +19,7 @@ Statuses: Not Started · In Progress · Implemented · Verified · Blocked. "Ver
 | 11 | Orgs, dashboards, memory, analytics | Not Started | |
 
 ## Next step (resume here)
-1. Grant Claude simulator access ("Let Claude use it"), then build a dev client (`npx expo run:ios`) and test the Senses screen against the dev branch (`app/.env.local` is already set up, gitignored). Sign in with an account created on the dev branch.
+1. Dev client is built and installed on the iPhone 17 simulator (`cd app && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx expo run:ios --device <udid>`; the locale vars are required for CocoaPods). Create an account on the dev branch, sign in on web and in the app's Senses screen.
 2. Create a test account on the dev branch, sign in on web (`npm run dev:web`), install + compose a Sense, refresh in the app: this completes the web→mobile journey test (DB path already verified with impersonated JWTs).
 3. Production: apply both vision migrations to `mibyan main db` only with explicit approval; delete dev branch afterwards.
 4. Then: visual workflow editor (React Flow), dashboards, real OCR/record/notify adapters, realtime sync.
