@@ -1,149 +1,118 @@
-import { LinearGradient } from 'expo-linear-gradient';
+import { useCameraPermissions } from 'expo-camera';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Linking, View } from 'react-native';
 
-import { Section, Segmented, rows } from '@/components/settings-rows';
+import { SenseOrb, type SenseOrbState } from '@/components/sense-orb';
 import { Text } from '@/components/text';
-import { BottomTabInset, MinTouch, OrbColors, Radius, Spacing, useColors } from '@/constants/theme';
-import { useGlasses, type GlassesStatus } from '@/lib/glasses';
+import { Badge, Banner, Button, Card, Divider, Group, LargeTitle, Row, Screen, StatusDot } from '@/components/ui';
+import { Spacing, useColors } from '@/constants/theme';
+import { useCameraSource, useGlasses } from '@/lib/glasses';
 import { useI18n } from '@/lib/i18n';
-import { useSettings, type Settings } from '@/lib/settings';
+import { senseName, useInstalledSenses } from '@/lib/sixth';
+import { useS } from '@/lib/strings';
 
-const DOT: Record<GlassesStatus, string> = {
-  unsupported: '#FF9F0A',
-  unregistered: '#FF9F0A',
-  registering: '#FF9F0A',
-  needsCamera: '#FF9F0A',
-  needsUpdate: '#FF9F0A',
-  ready: '#34C759',
-};
+import { Glasses } from '../../../modules/mubayan-glasses';
 
-export default function GlassesScreen() {
-  const insets = useSafeAreaInsets();
+export default function GlassesTab() {
+  const s = useS();
   const c = useColors();
-  const { settings, update } = useSettings();
-  const { t, dir } = useI18n();
   const router = useRouter();
+  const { lang } = useI18n();
   const glasses = useGlasses();
-  // Tabs stay mounted; re-check when coming back from a camera screen.
+  const source = useCameraSource();
+  const installed = useInstalledSenses();
+  const [cam, requestCam] = useCameraPermissions();
+  // Tabs stay mounted; re-check when coming back to this one.
   useFocusEffect(glasses.refresh);
-  const status = t.glassesStatus[glasses.status];
 
-  const intervals = ([1, 3, 5] as const).map((n) => ({ id: String(n) as '1' | '3' | '5', label: t.seconds(n) }));
+  const st = glasses.status;
+  const ready = st === 'ready';
+  const orb: SenseOrbState = ready ? 'connected' : st === 'registering' ? 'analyzing' : glasses.error ? 'error' : 'disconnected';
+  const action =
+    st === 'unregistered' ? { label: s.gConnect, icon: 'link' as const }
+    : st === 'needsCamera' ? { label: s.gAllowCamera, icon: 'camera.fill' as const }
+    : st === 'needsUpdate' ? { label: s.gUpdate, icon: 'arrow.down.circle.fill' as const }
+    : null;
+
+  const cap = (verified: boolean) => (st === 'unsupported' ? s.gCapNotSupported : verified ? s.gCapVerified : s.gCapNotVerified);
+  const capTone = (verified: boolean) => (verified ? 'success' : st === 'unsupported' ? 'danger' : 'neutral');
+  const onDevice = installed.items.filter((i) => i.enabled && i.manifest.supported_devices.includes('meta_glasses'));
 
   return (
-    <ScrollView
-      style={[styles.root, { backgroundColor: c.surface, direction: dir }]}
-      onMagicTap={() => router.push({ pathname: '/session', params: { mode: 'ask' } })}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: insets.top + Spacing.four, paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
-      ]}>
-      <Text variant="display" accessibilityRole="header">
-        {t.devices}
-      </Text>
+    <Screen tabs onRefresh={glasses.refresh}>
+      <LargeTitle>{s.glassesTitle}</LargeTitle>
 
-      {/* Device hero for the paired glasses */}
-      <View
-        style={[styles.device, { backgroundColor: c.card, shadowColor: c.shadow }]}
-        accessible
-        accessibilityLabel={`${t.rayban}, ${t.firstGen}. ${status.badge}. ${status.note}`}>
-        <View style={styles.deviceHead}>
-          <View style={{ gap: Spacing.half }}>
-            <Text variant="title">Ray-Ban Meta</Text>
-            <Text variant="caption" tone="secondary">
-              {t.firstGen}
-            </Text>
+      <Card style={{ alignItems: 'center', gap: Spacing.two }}>
+        <SenseOrb size={140} state={orb} />
+        <View style={{ marginTop: -Spacing.four, alignItems: 'center', gap: Spacing.one }}>
+          <Text variant="title" center>{s.gDevice}</Text>
+          <View style={{ flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }}>
+            <StatusDot tone={ready ? 'success' : st === 'unsupported' ? 'idle' : 'warning'} />
+            <Text variant="heading" tone={ready ? 'success' : 'secondary'}>{s.gStatus[st]}</Text>
           </View>
-          <View style={[styles.badge, { backgroundColor: c.surface }]}>
-            <View style={[styles.dot, { backgroundColor: DOT[glasses.status] }]} />
-            <Text variant="caption">{status.badge}</Text>
-          </View>
+          <Text tone="secondary" center variant="caption">{s.gStatusNote[st]}</Text>
         </View>
-        <LinearGradient
-          colors={[`${OrbColors[0]}18`, `${OrbColors[2]}22`, `${OrbColors[1]}18`]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}>
-          <SymbolView name="eyeglasses" size={120} tintColor={c.text} weight="light" />
-        </LinearGradient>
-        <View style={[styles.note, { backgroundColor: c.surface }]}>
-          <SymbolView
-            name={glasses.status === 'ready' ? 'eyeglasses' : 'iphone.rear.camera'}
-            size={22}
-            tintColor={c.accent}
-          />
-          <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
-            {glasses.error ?? status.note}
-          </Text>
-        </View>
-        {status.action && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={status.action}
-            accessibilityHint={t.opensMetaAI}
-            accessibilityState={{ busy: glasses.busy }}
-            disabled={glasses.busy}
-            onPress={glasses.connect}
-            style={({ pressed }) => [
-              styles.connect,
-              { backgroundColor: c.accent, opacity: pressed || glasses.busy ? 0.6 : 1 },
-            ]}>
-            <Text variant="heading" center style={{ color: c.onAccent }}>
-              {status.action}
-            </Text>
-          </Pressable>
-        )}
-      </View>
+        {action ? <Button label={action.label} icon={action.icon} loading={glasses.busy} onPress={() => void glasses.connect()} style={{ alignSelf: 'stretch' }} /> : null}
+        {st === 'registering' ? <Button variant="secondary" label={s.gCheckAgain} onPress={glasses.refresh} style={{ alignSelf: 'stretch' }} /> : null}
+        {glasses.error ? <Banner tone="danger" icon="xmark.octagon.fill" message={glasses.error} /> : null}
+      </Card>
 
-      <Section title={t.sectionLive}>
-        <View style={rows.pad}>
-          <Text variant="heading">{t.liveEvery}</Text>
-          <Segmented
-            options={intervals}
-            value={String(Math.min(settings.liveEvery, 5)) as '1' | '3' | '5'}
-            onChange={(v) => update({ liveEvery: Number(v) as Settings['liveEvery'] })}
-          />
-          <Text variant="caption" tone="secondary">
-            {t.liveHint}
-          </Text>
-        </View>
-      </Section>
-    </ScrollView>
+      <Group title={s.gSessionActive}>
+        <Row icon="video.fill" hue={source.glasses ? c.success : undefined} title={source.glasses ? s.gSessionActive : s.gSessionNone} subtitle={`${s.gSource}: ${source.glasses ? s.gSourceGlasses : s.gSourcePhone}`} />
+        <Divider />
+        <Row icon="battery.50percent" title={s.gBattery} subtitle={s.gBatteryUnknown} />
+      </Group>
+
+      {/* Only what has been verified is marked available. */}
+      <Group title={s.gCapabilities}>
+        <Row icon="camera.fill" title={s.gCapCamera} trailing={<Badge tone={capTone(ready)} label={cap(ready)} />} />
+        <Divider />
+        <Row icon="photo.fill" title={s.gCapPhoto} subtitle={source.frame ? undefined : undefined} trailing={<Badge tone={capTone(!!source.frame)} label={cap(!!source.frame)} />} />
+        <Divider />
+        <Row icon="dot.radiowaves.left.and.right" title={s.gCapLive} trailing={<Badge tone="neutral" label={st === 'unsupported' ? s.gCapNotSupported : s.gCapNotVerified} />} />
+        <Divider />
+        <Row icon="mic.fill" title={s.gCapAudioIn} subtitle={s.gCapAudioNote} trailing={<Badge label={s.gCapNotVerified} />} />
+        <Divider />
+        <Row icon="speaker.wave.2.fill" title={s.gCapAudioOut} trailing={<Badge label={s.gCapNotVerified} />} />
+      </Group>
+
+      <Group title={s.gActiveSenses}>
+        {onDevice.length ? onDevice.map((i, n) => (
+          <View key={i.manifest.id}>
+            {n > 0 && <Divider />}
+            <Row icon="sparkles" title={senseName(i.manifest, lang)} chevron onPress={() => router.push(`/sense/${i.manifest.id}`)} />
+          </View>
+        )) : <Row title={s.noActiveSenses} />}
+      </Group>
+
+      <Group title={s.gPermissions}>
+        <Row
+          icon="camera"
+          title={s.perm.camera}
+          subtitle={cam?.granted ? s.obPermGranted : s.lvPermDenied}
+          trailing={cam?.granted ? <Badge tone="success" label={s.on} /> : <Button compact label={s.obPermGrant} variant="secondary" onPress={() => (cam?.canAskAgain === false ? void Linking.openSettings() : void requestCam())} />}
+        />
+        <Divider />
+        <Row icon="gearshape.fill" title={s.gOpenSettings} chevron onPress={() => void Linking.openSettings()} />
+        <Divider />
+        <Row icon="slider.horizontal.3" title={s.gSettings} subtitle={s.gSettingsBody} chevron onPress={() => router.push('/glasses-settings')} />
+      </Group>
+
+      <Group title={s.gDiagnostics}>
+        <Row title="Meta Wearables SDK" subtitle={Glasses ? 'OK' : s.gCapNotSupported} icon="cpu" />
+        <Divider />
+        <Row title={s.gStatus[st]} subtitle={st} icon="stethoscope" trailing={<SymbolView name="arrow.clockwise" size={16} tintColor={c.accentText} />} onPress={glasses.refresh} />
+      </Group>
+
+      <Group title={s.gTroubleshoot}>
+        {s.gTips.map((tip, i) => (
+          <View key={i}>
+            {i > 0 && <Divider />}
+            <Row icon="lightbulb" title={tip} />
+          </View>
+        ))}
+      </Group>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  content: { paddingHorizontal: Spacing.three, gap: Spacing.four },
-  device: {
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    gap: Spacing.three,
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  deviceHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    minHeight: 32,
-    paddingVertical: Spacing.one,
-    borderRadius: Radius.full,
-  },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  hero: { height: 170, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    padding: Spacing.three,
-    borderRadius: Radius.sm,
-  },
-  connect: { minHeight: MinTouch, paddingVertical: Spacing.two, paddingHorizontal: Spacing.four, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
-});

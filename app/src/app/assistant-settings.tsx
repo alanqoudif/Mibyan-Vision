@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconAction } from '@/components/chrome';
 import { Divider, Section, Segmented, ToggleRow, rows } from '@/components/settings-rows';
 import { Text } from '@/components/text';
-import { BottomTabInset, MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
+import { MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
 import { useAnnounce } from '@/lib/a11y';
 import * as Earcons from '@/lib/earcons';
 import { EMERGENCY_SERVICES, addEmergency, cleanPhone, dial, removeEmergency, useEmergency } from '@/lib/emergency';
@@ -18,7 +18,7 @@ import { ago, forget, forgetAll, useMemory } from '@/lib/memory';
 import { useSettings, type Settings } from '@/lib/settings';
 
 /** Everything personal about the assistant: who to call, how it talks, what it remembers. */
-export default function AssistantScreen() {
+export default function AssistantSettingsScreen() {
   const insets = useSafeAreaInsets();
   const c = useColors();
   const { settings, update } = useSettings();
@@ -46,13 +46,13 @@ export default function AssistantScreen() {
 
   return (
     <ScrollView
-      style={[styles.root, { backgroundColor: c.surface, direction: dir }]}
+      style={[styles.root, { backgroundColor: c.background, direction: dir }]}
       onMagicTap={() => router.push({ pathname: '/session', params: { mode: 'ask' } })}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + Spacing.four, paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
+        { paddingTop: Spacing.three, paddingBottom: insets.bottom + Spacing.four },
       ]}>
       <Text variant="display" accessibilityRole="header">
         {t.assistantTitle}
