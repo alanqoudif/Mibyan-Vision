@@ -346,6 +346,7 @@ export default function FindScreen() {
           accessibilityRole="button"
           accessibilityLabel={phase === 'searching' ? t.pause : t.findResume}
           disabled={phase === 'asking'}
+          accessibilityState={{ disabled: phase === 'asking' }}
           onPress={toggle}
           style={({ pressed }) => [
             styles.pill,
