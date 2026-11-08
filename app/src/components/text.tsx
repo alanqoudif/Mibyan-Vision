@@ -4,7 +4,7 @@ import { MaxFontScale, Type, useColors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
 
 type Variant = keyof typeof Type;
-type Tone = 'primary' | 'secondary' | 'tertiary' | 'accent';
+type Tone = 'primary' | 'secondary' | 'tertiary' | 'accent' | 'danger';
 
 export function Text({
   variant = 'body',
@@ -15,7 +15,7 @@ export function Text({
 }: TextProps & { variant?: Variant; tone?: Tone; center?: boolean }) {
   const c = useColors();
   const { dir } = useI18n();
-  const color = { primary: c.text, secondary: c.textSecondary, tertiary: c.textTertiary, accent: c.accent }[tone];
+  const color = { primary: c.text, secondary: c.textSecondary, tertiary: c.textTertiary, accent: c.accent, danger: c.stopText }[tone];
   const align = center ? 'center' : dir === 'rtl' ? 'right' : 'left';
   return (
     <RNText
