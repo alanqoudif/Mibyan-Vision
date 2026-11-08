@@ -27,7 +27,7 @@ import { CameraPreview } from '@/components/camera-preview';
 import { CircleButton } from '@/components/chrome';
 import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { CameraAlert, Radius, Spacing, useColors } from '@/constants/theme';
 import { SILENT, URGENT, parseTags, splitAnswer, streamAssist, visibleText, type Turn } from '@/lib/assist';
 import { matchCommand } from '@/lib/commands';
 import * as Earcons from '@/lib/earcons';
@@ -445,6 +445,7 @@ export default function LiveScreen() {
   };
 
   const latest = notes[0];
+  const alert = obstacle?.level === 3 ? CameraAlert.danger : CameraAlert.warning;
 
   return (
     <View
@@ -472,9 +473,9 @@ export default function LiveScreen() {
             </Text>
           </View>
           {fromGlasses && !!obstacle?.level && (
-            <View style={[styles.sourceChip, { backgroundColor: obstacle.level === 3 ? '#FF3B30' : '#FF9F0A' }]}>
-              <SymbolView name="sensor.fill" size={14} tintColor="#FFFFFF" />
-              <Text variant="caption" style={{ color: '#FFFFFF' }}>
+            <View style={[styles.sourceChip, { backgroundColor: alert.fill }]}>
+              <SymbolView name="sensor.fill" size={14} tintColor={alert.text} />
+              <Text variant="caption" style={{ color: alert.text }}>
                 {t.obstacle(obstacle.level, obstacle.side, obstacle.label)}
               </Text>
             </View>
@@ -553,7 +554,7 @@ function LiveChip({ paused, label }: { paused: boolean; label: string }) {
   return (
     <View style={[styles.chip, { backgroundColor: paused ? c.surface : 'rgba(255,59,48,0.12)' }]}>
       <Animated.View style={[styles.dot, { backgroundColor: paused ? c.textTertiary : '#FF3B30' }, dot]} />
-      <Text variant="caption">{label}</Text>
+      <Text variant="caption" accessibilityRole="header">{label}</Text>
     </View>
   );
 }
@@ -597,7 +598,7 @@ const styles = StyleSheet.create({
     minHeight: 28,
     paddingVertical: Spacing.half,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: CameraAlert.scrim,
   },
   orbCorner: { alignSelf: 'flex-end', marginBottom: -Spacing.three, marginEnd: -Spacing.three },
   feed: { paddingHorizontal: Spacing.four, paddingVertical: Spacing.four, gap: Spacing.three },
