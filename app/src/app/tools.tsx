@@ -4,7 +4,7 @@ import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CircleButton } from '@/components/chrome';
+import { ScreenHeader } from '@/components/chrome';
 import { Text } from '@/components/text';
 import { Radius, Spacing, useColors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
@@ -32,13 +32,7 @@ export default function ToolsScreen() {
           paddingTop: insets.top + Spacing.two,
         },
       ]}>
-      <View style={styles.topBar}>
-        <CircleButton icon="xmark" label={t.close} onPress={() => router.back()} />
-        <Text variant="heading" accessibilityRole="header">
-          {t.toolsTitle}
-        </Text>
-        <View style={{ width: 48 }} />
-      </View>
+      <ScreenHeader title={t.toolsTitle} closeLabel={t.close} onClose={() => router.back()} />
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + Spacing.four }]}>
         <Tool icon="sparkles" label={lang === 'ar' ? 'الحواس' : 'Senses'} onPress={() => router.push('/senses')} />
         <Tool icon="puzzlepiece.extension" label={t.manageTools} onPress={() => router.push('/plugins')} />
@@ -70,7 +64,7 @@ function Tool({
         onPress();
       }}
       style={({ pressed }) => [styles.tool, pressed && { backgroundColor: c.surface }]}>
-      <View style={[styles.thumb, { backgroundColor: c.card }]}>
+      <View style={[styles.thumb, { backgroundColor: c.surface }]}>
         <SymbolView name={icon} size={24} tintColor={c.text} weight="medium" />
       </View>
       <Text variant="heading" style={{ flex: 1 }}>
@@ -82,13 +76,6 @@ function Tool({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-  },
   list: { padding: Spacing.two, gap: Spacing.one },
   tool: {
     flexDirection: 'row',

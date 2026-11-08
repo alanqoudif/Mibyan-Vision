@@ -2,13 +2,16 @@ import type { PharmacyItem } from '@mibyan/shared';
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File as ExpoFile, Paths } from 'expo-file-system';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Fragment, useCallback, useEffect, useState } from 'react';
+import { SymbolView } from 'expo-symbols';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CircleButton } from '@/components/chrome';
+import { Field, IconAction, PillButton, ScreenHeader } from '@/components/chrome';
+import { Divider, Section, rows } from '@/components/settings-rows';
 import { Text } from '@/components/text';
-import { Radius, Spacing, useColors } from '@/constants/theme';
+import { Spacing, useColors } from '@/constants/theme';
+import { useAnnounce } from '@/lib/a11y';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { readJSON, writeJSON } from '@/lib/storage';
@@ -22,6 +25,7 @@ const LOCAL_DIR = new Directory(Paths.document, 'pharmacy-catalog');
 export default function PharmacyScreen() {
   const router = useRouter(); const c = useColors(); const insets = useSafeAreaInsets(); const { t, dir } = useI18n();
   const [items, setItems] = useState<PharmacyItem[]>([]); const [files, setFiles] = useState<CatalogFile[]>([]); const [form, setForm] = useState(blank); const [userId, setUserId] = useState<string | null>(null); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false);
+  useAnnounce(error || notice);
   const load = useCallback(async () => {
     const localFiles = readJSON<CatalogFile[]>(LOCAL_FILES, []).filter((file) => new ExpoFile(file.object_path).exists);
     if (!supabase) { setFiles(localFiles); return; }
@@ -71,7 +75,7 @@ export default function PharmacyScreen() {
       setError(''); setNotice(supabase && userId ? t.pharmacyUploadDone : t.pharmacyLocalSaved); await load();
     } catch (cause) {
       console.warn('catalog file upload failed', cause);
-      setError(cause instanceof Error && cause.message.endsWith('25 MB') ? (dir === 'rtl' ? 'الحد الأقصى لحجم الملف 25 ميغابايت.' : 'Maximum file size is 25 MB.') : t.pharmacyUploadError);
+      setError(cause instanceof Error && cause.message.endsWith('25 MB') ? t.fileTooBig : t.pharmacyUploadError);
     } finally { setBusy(false); }
   }
   async function removeFile(file: CatalogFile) {
@@ -88,23 +92,79 @@ export default function PharmacyScreen() {
     const { error: rowError } = await supabase.from('mata_pharmacy_files').delete().eq('id', file.id);
     if (rowError) setError(rowError.message); else await load();
   }
-  const inputStyle = [styles.input, { backgroundColor: c.card, color: c.text, borderColor: c.border, textAlign: dir === 'rtl' ? 'right' as const : 'left' as const }];
-  return <ScrollView style={{ backgroundColor: c.background }} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 30, direction: dir }]} keyboardShouldPersistTaps="handled">
-    <View style={styles.header}><CircleButton icon="chevron.backward" label={t.close} onPress={() => router.back()} /><Text variant="heading">{t.pharmacyTitle}</Text><View style={{ width: 48 }} /></View>
-    <Text tone="secondary">{t.pharmacyIntro}</Text>{error ? <Text style={{ color: '#b63449' }}>{error}</Text> : null}{notice ? <Text tone="accent">{notice}</Text> : null}
-    <View style={[styles.card, { backgroundColor: c.surface }]}><Text variant="title">{t.pharmacyAdd}</Text>
-      <TextInput style={inputStyle} placeholder={t.pharmacyName} value={form.name} onChangeText={(name) => setForm({ ...form, name })} />
-      <TextInput style={inputStyle} placeholder={t.pharmacyStrength} value={form.strength} onChangeText={(strength) => setForm({ ...form, strength })} />
-      <View style={styles.row}><TextInput style={[...inputStyle, { flex: 1 }]} placeholder={t.pharmacyShelf} value={form.shelf} onChangeText={(shelf) => setForm({ ...form, shelf })} /><TextInput style={[...inputStyle, { flex: 1 }]} placeholder={t.pharmacyRow} value={form.row} onChangeText={(row) => setForm({ ...form, row })} /></View>
-      <TextInput style={inputStyle} placeholder={t.pharmacyPosition} value={form.position} onChangeText={(position) => setForm({ ...form, position })} />
-      <Pressable style={[styles.button, { backgroundColor: c.accent }]} onPress={() => void save()}><Text style={{ color: '#fff', fontWeight: '600' }}>{t.pharmacySave}</Text></Pressable>
+  const busyLabel = t.uploading;
+  return (
+    <View style={[styles.root, { backgroundColor: c.surface, direction: dir, paddingTop: insets.top + Spacing.two }]}>
+      <ScreenHeader title={t.pharmacyTitle} closeLabel={t.close} onClose={() => router.back()} />
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.five }]} keyboardShouldPersistTaps="handled">
+        <Text tone="secondary">{t.pharmacyIntro}</Text>
+        {!!error && <Text tone="danger" accessibilityLiveRegion="polite">{error}</Text>}
+        {!!notice && <Text accessibilityLiveRegion="polite">{notice}</Text>}
+
+        <Section title={t.pharmacyAdd}>
+          <View style={rows.pad}>
+            <Field label={t.pharmacyName} value={form.name} onChangeText={(name) => setForm({ ...form, name })} />
+            <Field label={t.pharmacyStrength} value={form.strength} onChangeText={(strength) => setForm({ ...form, strength })} />
+            <View style={styles.pair}>
+              <Field label={t.pharmacyShelf} containerStyle={styles.half} value={form.shelf} onChangeText={(shelf) => setForm({ ...form, shelf })} />
+              <Field label={t.pharmacyRow} containerStyle={styles.half} value={form.row} onChangeText={(row) => setForm({ ...form, row })} />
+            </View>
+            <Field label={t.pharmacyPosition} value={form.position} onChangeText={(position) => setForm({ ...form, position })} />
+            <PillButton label={t.pharmacySave} onPress={() => void save()} />
+          </View>
+        </Section>
+
+        <Section title={t.pharmacyFiles}>
+          <View style={rows.pad}>
+            <Text variant="caption" tone="secondary">{t.pharmacyUploadHint}</Text>
+            <PillButton icon="paperclip" label={busy ? busyLabel : t.pharmacyAttach} variant="secondary" busy={busy} onPress={() => void attachFiles()} />
+          </View>
+          {files.map((file) => (
+            <Fragment key={file.id}>
+              <Divider />
+              <View style={rows.row}>
+                <SymbolView name="doc" size={22} tintColor={c.textSecondary} />
+                <Text style={{ flex: 1 }} numberOfLines={2} ellipsizeMode="middle">{file.file_name}</Text>
+                <IconAction icon="trash" label={t.pharmacyRemoveFile(file.file_name)} color={c.stopText} size={20} onPress={() => void removeFile(file)} />
+              </View>
+            </Fragment>
+          ))}
+        </Section>
+
+        <Section title={`${t.pharmacyItems} (${items.length})`}>
+          {items.length === 0 && (
+            <View style={rows.row}>
+              <Text tone="secondary">{t.pharmacyEmpty}</Text>
+            </View>
+          )}
+          {items.map((item, i) => {
+            const name = `${item.name}${item.strength ? ` · ${item.strength}` : ''}`;
+            return (
+              <Fragment key={item.id}>
+                {i > 0 && <Divider />}
+                <View style={rows.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="heading">{name}</Text>
+                    <Text variant="caption" tone="secondary">
+                      {t.pharmacyShelf} <Text variant="caption" tone="secondary" style={styles.num}>{item.shelf}</Text> · {t.pharmacyRow} <Text variant="caption" tone="secondary" style={styles.num}>{item.row}</Text>
+                      {item.position ? ` · ${item.position}` : ''}
+                    </Text>
+                  </View>
+                  <IconAction icon="trash" label={t.pharmacyRemoveItem(name)} color={c.stopText} size={20} onPress={async () => { await supabase?.from('mata_pharmacy_items').delete().eq('id', item.id); await load(); }} />
+                </View>
+              </Fragment>
+            );
+          })}
+        </Section>
+      </ScrollView>
     </View>
-    <View style={[styles.card, { backgroundColor: c.surface }]}><Text variant="title">{t.pharmacyFiles}</Text><Text variant="caption" tone="secondary">{t.pharmacyUploadHint}</Text>
-      <Pressable disabled={busy} style={[styles.button, { backgroundColor: c.card, opacity: busy ? 0.6 : 1 }]} onPress={() => void attachFiles()}><Text>{busy ? (dir === 'rtl' ? 'جارٍ الرفع…' : 'Uploading…') : t.pharmacyAttach}</Text></Pressable>
-      {files.map((file) => <View key={file.id} style={styles.row}><Text style={{ flex: 1 }} numberOfLines={1}>{file.file_name}</Text><Pressable onPress={() => void removeFile(file)}><Text style={{ color: '#a23a4c' }}>{t.pharmacyFileRemove}</Text></Pressable></View>)}
-    </View>
-    <Text variant="heading">{t.pharmacyItems} ({items.length})</Text>{items.map((item) => <View key={item.id} style={[styles.card, { backgroundColor: c.surface }]}><View style={styles.row}><Text variant="heading" style={{ flex: 1 }}>{item.name}{item.strength ? ` · ${item.strength}` : ''}</Text><Pressable onPress={async () => { await supabase?.from('mata_pharmacy_items').delete().eq('id', item.id); await load(); }}><Text style={{ color: '#a23a4c' }}>{t.pharmacyDelete}</Text></Pressable></View><Text variant="caption" tone="secondary">{t.pharmacyShelf} {item.shelf} · {t.pharmacyRow} {item.row}{item.position ? ` · ${item.position}` : ''}</Text></View>)}
-  </ScrollView>;
+  );
 }
 
-const styles = StyleSheet.create({ content: { paddingHorizontal: Spacing.three, gap: Spacing.two }, header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, card: { padding: Spacing.three, borderRadius: Radius.lg, gap: Spacing.two }, row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two }, input: { minHeight: 46, borderWidth: 1, borderRadius: Radius.md, padding: 12 }, button: { minHeight: 48, borderRadius: Radius.md, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  content: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, gap: Spacing.four },
+  pair: { flexDirection: 'row', gap: Spacing.two },
+  half: { flex: 1, minWidth: 0 },
+  num: { fontVariant: ['tabular-nums'] },
+});

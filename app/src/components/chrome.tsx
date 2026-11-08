@@ -1,9 +1,9 @@
 import * as Haptics from 'expo-haptics';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
-import { Pressable, StyleSheet, View, type PressableProps, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View, type PressableProps, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
-import { MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
+import { MaxFontScale, MinTouch, Radius, Spacing, Type, useColors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
 
 /** Round header button with a soft shadow. Visual 48pt plus hitSlop, so the target is ≥ 56pt. */
@@ -105,4 +105,138 @@ const styles = StyleSheet.create({
   },
   dot: { width: 7, height: 7, borderRadius: 4 },
   iconAction: { width: MinTouch, height: MinTouch, alignItems: 'center', justifyContent: 'center' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.two,
+  },
+  headerEnd: { minWidth: 48, alignItems: 'flex-end' },
+  pillButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    minHeight: 60,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    borderRadius: Radius.full,
+  },
+  field: {
+    ...Type.body,
+    minHeight: MinTouch,
+    minWidth: 0,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  fieldMultiline: { minHeight: 120, textAlignVertical: 'top' },
 });
+
+/**
+ * Header shared by every modal screen: close (or back) at the start, the title as the screen's
+ * header in the middle, and an optional trailing control (or an equal spacer) at the end.
+ */
+export function ScreenHeader({
+  title,
+  closeLabel,
+  onClose,
+  icon = 'xmark',
+  trailing,
+}: {
+  title: string;
+  closeLabel: string;
+  onClose: () => void;
+  icon?: SFSymbol;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <View style={styles.header}>
+      <CircleButton icon={icon} label={closeLabel} onPress={onClose} />
+      <Text variant="heading" center accessibilityRole="header" numberOfLines={2} style={{ flex: 1 }}>
+        {title}
+      </Text>
+      <View style={styles.headerEnd}>{trailing}</View>
+    </View>
+  );
+}
+
+/**
+ * The one button shape: a 56pt pill. `primary` is ink (the main action on a screen), `secondary`
+ * a grey well, `destructive` the stop well. Labels use heading type and never shrink.
+ */
+export function PillButton({
+  label,
+  icon,
+  variant = 'primary',
+  busy,
+  disabled,
+  onPress,
+  accessibilityLabel,
+  accessibilityHint,
+  style,
+}: {
+  label: string;
+  icon?: SFSymbol;
+  variant?: 'primary' | 'secondary' | 'destructive';
+  busy?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  style?: ViewStyle;
+}) {
+  const c = useColors();
+  const bg = { primary: c.text, secondary: c.surface, destructive: c.stop }[variant];
+  const fg = { primary: c.background, secondary: c.text, destructive: c.stopText }[variant];
+  const off = disabled || busy;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: !!off, busy: !!busy }}
+      disabled={off}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      style={({ pressed }) => [styles.pillButton, { backgroundColor: bg, opacity: off ? 0.45 : pressed ? 0.75 : 1 }, style]}>
+      {!!icon && <SymbolView name={icon} size={20} tintColor={fg} weight="semibold" />}
+      <Text variant="heading" center style={{ color: fg, flexShrink: 1 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** Text field with a visible label above it (placeholders vanish while typing; labels don't). */
+export function Field({
+  label,
+  containerStyle,
+  multiline,
+  ...rest
+}: Omit<TextInputProps, 'style'> & { label: string; containerStyle?: ViewStyle }) {
+  const c = useColors();
+  const { dir } = useI18n();
+  return (
+    <View style={[{ gap: Spacing.one }, containerStyle]}>
+      <Text variant="caption" tone="secondary" importantForAccessibility="no" accessibilityElementsHidden>
+        {label}
+      </Text>
+      <TextInput
+        accessibilityLabel={label}
+        placeholderTextColor={c.textTertiary}
+        maxFontSizeMultiplier={MaxFontScale}
+        multiline={multiline}
+        style={[
+          styles.field,
+          multiline && styles.fieldMultiline,
+          { backgroundColor: c.field, color: c.text, textAlign: dir === 'rtl' ? 'right' : 'left', writingDirection: dir },
+        ]}
+        {...rest}
+      />
+    </View>
+  );
+}
