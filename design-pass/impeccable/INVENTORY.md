@@ -29,17 +29,21 @@ Status: **done** = audited, fixed and re-checked · **audited** = audited and re
 
 ## Vision website (`web/src/app`)
 
-| Page | Route | Group / PR | Status |
-|---|---|---|---|
-| Landing | `/` | D | pending (next PR) |
-| Plugins workspace | `/plugins` | D | pending (next PR) |
-| Pharmacy catalog | `/pharmacy` | D | pending (next PR) |
-| Studio overview | `/studio` | D | pending (next PR) |
-| Studio marketplace | `/studio/marketplace` | D | pending (next PR) |
-| Studio composer | `/studio/composer` | D | pending (next PR) |
-| Studio my Senses | `/studio/senses` | D | pending (next PR) |
-| Studio handover | `/studio/handover` | D | pending (next PR) |
-| Auth callback | `/auth/callback` | D | skipped: route handler, no UI |
+Rendered with `next dev` at 1440×900 and 390×844, light and dark system scheme (`design-pass/impeccable/tools/shootweb.mjs`). The site was three separate violet worlds (light purple workspace, violet/cyan/sand landing, violet Studio); all three now use Mibyan values: ink primary buttons, Atlas Blue for links, focus and brand, neutral greys, one status colour at a time.
+
+| Page | Route | Group / PR | Status | What changed |
+|---|---|---|---|---|
+| Landing | `/` | D | done | Violet/cyan/sand palette → Atlas Blue + neutrals (primary button `#0076d3` with white, 4.6:1). Nine eyebrow "kicker" labels above section headings removed (craft-floor ban). Hero art narrowed on phones so the orbiting labels stay on screen. Stays dark on purpose. |
+| Plugins workspace | `/plugins` | D | done | Purple → ink primary + blue links; grey text raised to 4.5:1 (`#827c8f` 4.0:1 → `#636363`); 11–12px text raised to 13px; small buttons 37 → 44px; inputs get a visible outline (`#a8a8a8`); visible focus ring; eyebrow removed. |
+| Pharmacy catalog | `/pharmacy` | D | done | Same stylesheet as plugins; eyebrow removed. |
+| Studio overview | `/studio` | D | done (sign-in gate only) | Studio now follows the system scheme (light by default, was dark-only), flat cards instead of gradients and glows, ink primary button, 13px chip floor. On phones the sign-in card no longer sits under a full screen of empty space. |
+| Studio marketplace | `/studio/marketplace` | D | done (sign-in gate only) | Shares the Studio stylesheet. Signed-in content not seen: needs a test account. |
+| Studio composer | `/studio/composer` | D | done (sign-in gate only) | Same. |
+| Studio my Senses | `/studio/senses` | D | done (sign-in gate only) | Same. |
+| Studio handover | `/studio/handover` | D | done (sign-in gate only) | Same. |
+| Auth callback | `/auth/callback` | D | skipped | Route handler, no UI. |
+
+Still for the owner: the logo image (`web/public/logo.png`) is itself purple, so the brand mark on `/plugins` and `/pharmacy` is the one remaining off-palette element; replacing it needs a new asset.
 
 ## How screenshots are made
 
@@ -56,4 +60,4 @@ node design-pass/impeccable/tools/shoot.mjs <outDir> [route,...] --langs=ar,en -
 
 - They come from a browser, not the iOS Simulator (this Mac has no Xcode). SF Symbols do not draw on web, so icons are missing, and the native tab bar shows as a floating pill at the top. Shadows under floating buttons don't render either.
 - Dynamic Type at 200% can't be emulated on web; large-text behaviour was checked in code only.
-- Screens that need a signed-in account (Senses list, plugin editing, pharmacy items) were captured signed out.
+- Screens that need a signed-in account (app: Senses list, plugin editing, pharmacy items; web: every Studio page) were captured signed out. A test account is needed to review them signed in.

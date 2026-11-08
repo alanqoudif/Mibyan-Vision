@@ -289,9 +289,9 @@ function HeroArt({ t }: { t: typeof C.en }) {
 function Logo() {
   return (
     <svg viewBox="0 0 28 28" aria-hidden="true">
-      <circle cx="14" cy="14" r="12.5" fill="none" stroke="#7c5cff" strokeWidth="1.5" />
-      <circle cx="14" cy="14" r="7.5" fill="none" stroke="#22d3ee" strokeWidth="1.5" />
-      <circle cx="14" cy="14" r="2.6" fill="#d9c3a0" />
+      <circle cx="14" cy="14" r="12.5" fill="none" stroke="#2784d5" strokeWidth="1.5" />
+      <circle cx="14" cy="14" r="7.5" fill="none" stroke="#6fb0f0" strokeWidth="1.5" />
+      <circle cx="14" cy="14" r="2.6" fill="#eeeeee" />
     </svg>
   );
 }
@@ -378,7 +378,6 @@ export default function Home() {
         <section className="idea" id="idea" aria-labelledby="h-idea">
           <div className="wrap idea-grid">
             <div>
-              <span className="kicker">{t.idea.k}</span>
               <h2 id="h-idea">{t.idea.h}</h2>
               <p style={{ marginTop: 20 }}>{t.idea.p1}</p>
               <p>{t.idea.p2}</p>
@@ -394,7 +393,6 @@ export default function Home() {
         <section id="how" aria-labelledby="h-how">
           <div className="wrap">
             <div className="sec-head">
-              <span className="kicker">{t.how.k}</span>
               <h2 id="h-how">{t.how.h}</h2>
             </div>
             <ol className="steps">
@@ -412,7 +410,6 @@ export default function Home() {
         <section className="market" id="market" aria-labelledby="h-market">
           <div className="wrap">
             <div className="sec-head">
-              <span className="kicker">{t.market.k}</span>
               <h2 id="h-market">{t.market.h}</h2>
               <p>{t.market.p}</p>
             </div>
@@ -441,7 +438,6 @@ export default function Home() {
         <section className="create" aria-labelledby="h-create">
           <div className="wrap create-grid">
             <div>
-              <span className="kicker">{t.create.k}</span>
               <h2 id="h-create">{t.create.h}</h2>
               <p className="lead">{t.create.lead}</p>
               <ul>
@@ -467,7 +463,6 @@ export default function Home() {
         <section className="uses" aria-labelledby="h-uses">
           <div className="wrap">
             <div className="sec-head">
-              <span className="kicker">{t.uses.k}</span>
               <h2 id="h-uses">{t.uses.h}</h2>
             </div>
             <ul className="use-grid">
@@ -485,7 +480,6 @@ export default function Home() {
         <section aria-labelledby="h-eco">
           <div className="wrap">
             <div className="sec-head">
-              <span className="kicker">{t.eco.k}</span>
               <h2 id="h-eco">{t.eco.h}</h2>
               <p>{t.eco.p}</p>
             </div>
@@ -513,7 +507,6 @@ export default function Home() {
         <section className="dev" id="dev" aria-labelledby="h-dev">
           <div className="wrap dev-grid">
             <div>
-              <span className="kicker">{t.dev.k}</span>
               <h2 id="h-dev">{t.dev.h}</h2>
               <p style={{ color: "var(--muted)", marginTop: 16, fontSize: 18 }}>{t.dev.p}</p>
               <ul>
@@ -536,7 +529,6 @@ export default function Home() {
         <section id="enterprise" aria-labelledby="h-ent">
           <div className="wrap">
             <div className="sec-head">
-              <span className="kicker">{t.ent.k}</span>
               <h2 id="h-ent">{t.ent.h}</h2>
             </div>
             <ul className="ent-grid">
@@ -557,7 +549,6 @@ export default function Home() {
         <section className="privacy" id="privacy" aria-labelledby="h-priv">
           <div className="wrap">
             <div className="sec-head">
-              <span className="kicker">{t.priv.k}</span>
               <h2 id="h-priv">{t.priv.h}</h2>
             </div>
             <ul className="priv-grid">
@@ -574,9 +565,9 @@ export default function Home() {
         <section className="final" aria-labelledby="h-final">
           <div className="wrap">
             <svg className="final-art" viewBox="0 0 120 120" aria-hidden="true">
-              <circle cx="60" cy="60" r="56" fill="none" stroke="#7c5cff" strokeWidth="1.5" strokeDasharray="3 8" />
-              <circle cx="60" cy="60" r="36" fill="none" stroke="#22d3ee" strokeWidth="1.5" opacity="0.7" />
-              <circle cx="60" cy="60" r="12" fill="#d9c3a0" />
+              <circle cx="60" cy="60" r="56" fill="none" stroke="#2784d5" strokeWidth="1.5" strokeDasharray="3 8" />
+              <circle cx="60" cy="60" r="36" fill="none" stroke="#6fb0f0" strokeWidth="1.5" opacity="0.7" />
+              <circle cx="60" cy="60" r="12" fill="#eeeeee" />
             </svg>
             <h2 id="h-final">{t.final.h}</h2>
             <p>{t.final.p}</p>
