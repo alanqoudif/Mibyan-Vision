@@ -491,7 +491,7 @@ function EmergencySection() {
                 accessibilityRole="button"
                 accessibilityState={{ selected: name === r }}
                 onPress={() => setName(r)}
-                style={[styles.chip, { backgroundColor: name === r ? c.text : c.surface }]}>
+                style={[styles.chip, { backgroundColor: name === r ? c.text : c.field }]}>
                 <Text variant="caption" style={{ color: name === r ? c.background : c.text }}>
                   {r}
                 </Text>
@@ -505,7 +505,7 @@ function EmergencySection() {
             placeholderTextColor={c.textTertiary}
             accessibilityLabel={t.emergencyName}
             returnKeyType="next"
-            style={[styles.input, align, { color: c.text, backgroundColor: c.surface }]}
+            style={[styles.input, align, { color: c.text, backgroundColor: c.field }]}
           />
           <TextInput
             value={phone}
@@ -516,7 +516,7 @@ function EmergencySection() {
             keyboardType="phone-pad"
             textContentType="telephoneNumber"
             onSubmitEditing={save}
-            style={[styles.input, align, { color: c.text, backgroundColor: c.surface }]}
+            style={[styles.input, align, { color: c.text, backgroundColor: c.field }]}
           />
           {error && (
             <Text accessibilityLiveRegion="polite" style={{ color: c.stopText }}>
