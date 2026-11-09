@@ -44,7 +44,7 @@ export default function SensesScreen() {
   const showPacks = !q.trim() && cat === 'all';
 
   return (
-    <Screen tabs onRefresh={() => { installed.refresh(); catalog.refresh(); }} refreshing={installed.loading}>
+    <Screen onRefresh={() => { installed.refresh(); catalog.refresh(); }} refreshing={installed.loading}>
       <LargeTitle>{s.sensesTitle}</LargeTitle>
       <SearchField value={q} onChange={setQ} placeholder={s.searchSenses} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.two }}>

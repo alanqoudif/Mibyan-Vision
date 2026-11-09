@@ -12,7 +12,7 @@ import { useI18n } from '@/lib/i18n';
 import { senseName, useInstalledSenses } from '@/lib/sixth';
 import { useS } from '@/lib/strings';
 
-import { Glasses } from '../../../modules/mubayan-glasses';
+import { Glasses } from '../../modules/mubayan-glasses';
 
 export default function GlassesTab() {
   const s = useS();
@@ -40,7 +40,7 @@ export default function GlassesTab() {
   const onDevice = installed.items.filter((i) => i.enabled && i.manifest.supported_devices.includes('meta_glasses'));
 
   return (
-    <Screen tabs onRefresh={glasses.refresh}>
+    <Screen onRefresh={glasses.refresh}>
       <LargeTitle>{s.glassesTitle}</LargeTitle>
 
       <Card style={{ alignItems: 'center', gap: Spacing.two }}>

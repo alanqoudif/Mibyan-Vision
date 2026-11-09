@@ -45,7 +45,7 @@ export default function ActivityTab() {
   const filters: [Filter, string][] = [['all', s.actAll], ['runs', s.actRuns], ['records', s.actRecords], ['alerts', s.actAlerts], ['memory', s.actMemory]];
 
   return (
-    <Screen tabs onRefresh={records.refresh} refreshing={records.loading}>
+    <Screen onRefresh={records.refresh} refreshing={records.loading}>
       <LargeTitle>{s.actTitle}</LargeTitle>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.two }}>
         {filters.map(([k, label]) => <Chip key={k} label={label} selected={filter === k} onPress={() => setFilter(k)} />)}

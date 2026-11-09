@@ -62,7 +62,11 @@ function Shell() {
         <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         <ExternalRoutes />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.background } }}>
-          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="index" />
+          <Stack.Screen name="profile" options={pushed('')} />
+          <Stack.Screen name="senses" options={pushed('')} />
+          <Stack.Screen name="glasses" options={pushed('')} />
+          <Stack.Screen name="activity" options={pushed('')} />
           <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="session" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
