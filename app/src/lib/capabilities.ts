@@ -2,6 +2,7 @@ import type { Href } from 'expo-router';
 import type { SFSymbol } from 'expo-symbols';
 
 import type { Lang } from '@/lib/i18n';
+import type { Shortcut } from '@/lib/settings';
 import { MODES, modeText, type ModeId } from '@/lib/modes';
 
 /**
@@ -73,4 +74,16 @@ export function capabilities(lang: Lang, enabled: ModeId[]): Capability[] {
 
 export function capabilityFor(id: string, lang: Lang, enabled: ModeId[]) {
   return capabilities(lang, enabled).find((c) => c.id === id);
+}
+
+export type ResolvedShortcut = { shortcut: Shortcut; label: string; icon: SFSymbol; cap?: Capability };
+
+/** What a saved shortcut shows and does now. Tools that were switched off drop out. */
+export function resolveShortcuts(list: Shortcut[], lang: Lang, enabled: ModeId[]): ResolvedShortcut[] {
+  const caps = capabilities(lang, enabled);
+  return list.flatMap((sc): ResolvedShortcut[] => {
+    if (sc.kind === 'prompt') return sc.text?.trim() ? [{ shortcut: sc, label: sc.label || sc.text, icon: 'text.bubble' }] : [];
+    const cap = caps.find((c) => c.id === sc.tool);
+    return cap ? [{ shortcut: sc, label: sc.label || cap.label, icon: cap.icon, cap }] : [];
+  });
 }

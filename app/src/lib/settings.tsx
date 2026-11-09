@@ -46,7 +46,27 @@ export type Settings = {
   speakResults: boolean;
   /** The new Sixth Sense onboarding has been completed. */
   sixthOnboarded: boolean;
+  /** Personalization: what the assistant should know about the user. */
+  aboutMe: string;
+  /** Personalization: how the assistant should answer. */
+  responseStyle: string;
+  /** Personalization: the app's accent colour. */
+  accent: Accent;
+  /** The buttons on the chat's start screen, in the user's order. */
+  shortcuts: Shortcut[];
 };
+
+export type Accent = 'violet' | 'blue' | 'teal' | 'amber' | 'rose';
+
+/** A one-tap button on the chat: opens a tool, or sends a sentence the user wrote. */
+export type Shortcut = { id: string; kind: 'tool' | 'prompt'; label: string; tool?: string; text?: string };
+
+export const DEFAULT_SHORTCUTS: Shortcut[] = [
+  { id: 'sc-describe', kind: 'tool', tool: 'describe', label: '' },
+  { id: 'sc-read', kind: 'tool', tool: 'read', label: '' },
+  { id: 'sc-where', kind: 'tool', tool: 'where', label: '' },
+  { id: 'sc-qibla', kind: 'tool', tool: 'qibla', label: '' },
+];
 
 const DEFAULTS: Settings = {
   lang: 'ar',
@@ -72,7 +92,15 @@ const DEFAULTS: Settings = {
   profileSenses: [],
   speakResults: true,
   sixthOnboarded: false,
+  aboutMe: '',
+  responseStyle: '',
+  accent: 'violet',
+  shortcuts: DEFAULT_SHORTCUTS,
 };
+
+/** The latest settings, for code outside React (the notes sent with every request). */
+let latest: Settings = DEFAULTS;
+export const currentSettings = () => latest;
 
 export const SPEECH_RATE: Record<Settings['speed'], number> = { slow: 0.85, normal: 1, fast: 1.2 };
 
@@ -108,7 +136,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => { setSyncReady(false); setTimeout(() => void sync(session?.user.id ?? null), 0); });
     return () => { active = false; subscription.unsubscribe(); };
   }, []);
-  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { settingsRef.current = settings; latest = settings; }, [settings]);
   useEffect(() => {
     const client = supabase;
     if (!syncReady || !syncOwner || !client) return;

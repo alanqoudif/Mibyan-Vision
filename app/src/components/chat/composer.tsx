@@ -82,10 +82,10 @@ function Round({ icon, label, hint, onPress, solid }: { icon: SFSymbol; label: s
       }}
       style={({ pressed }) => [
         styles.round,
-        solid ? { backgroundColor: c.text } : { borderColor: c.border, borderWidth: StyleSheet.hairlineWidth },
+        solid ? { backgroundColor: c.accent } : { borderColor: c.border, borderWidth: StyleSheet.hairlineWidth },
         { opacity: pressed ? 0.6 : 1 },
       ]}>
-      <SymbolView name={icon} size={18} tintColor={solid ? c.background : c.text} weight="semibold" />
+      <SymbolView name={icon} size={18} tintColor={solid ? c.onAccent : c.text} weight="semibold" />
     </Pressable>
   );
 }

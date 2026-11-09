@@ -4,7 +4,7 @@ import { Alert, View } from 'react-native';
 
 import { SignInCard } from '@/components/sign-in-card';
 import { Text } from '@/components/text';
-import { Button, Divider, Group, LargeTitle, Row, Screen, Segmented, TextField, Toggle } from '@/components/ui';
+import { Button, Divider, Group, LargeTitle, Row, Screen, Segmented, TextField } from '@/components/ui';
 import { Spacing, useColors } from '@/constants/theme';
 import { useChatS } from '@/lib/chat-strings';
 import { clearChats } from '@/lib/chats';
@@ -83,21 +83,21 @@ export default function SettingsScreen() {
         </View>
       </Group>
 
+      <Group>
+        <Row icon="paintbrush.fill" hue={c.accent} title={cs.personalize} subtitle={cs.personalizeHint} chevron onPress={() => router.push('/personalize')} />
+        <Divider />
+        <Row icon="square.grid.2x2.fill" hue={c.accent} title={cs.shortcuts} subtitle={cs.editShortcutsHint} chevron onPress={() => router.push('/shortcuts')} />
+      </Group>
+
       <Group title={cs.assistant}>
         <View style={{ padding: Spacing.three, gap: Spacing.two }}>
           <Text variant="heading">{s.prAi}</Text>
           <Segmented value={settings.model} options={[{ id: 'smart', label: s.prModelSmart }, { id: 'fast', label: s.prModelFast }]} onChange={(model) => update({ model })} />
         </View>
         <Divider />
-        <Row
-          icon="speaker.wave.2.fill"
-          title={s.prSpeakResults}
-          trailing={<Toggle value={settings.speakResults} onChange={(speakResults) => update({ speakResults })} label={s.prSpeakResults} />}
-        />
-        <Divider />
         <Row icon="figure.wave" title={s.prAccessibility} subtitle={s.prAccessibilityBody} chevron onPress={() => router.push('/assistant-settings')} />
         <Divider />
-        <Row icon="square.grid.2x2.fill" title={s.prTools} subtitle={s.prToolsBody} chevron onPress={() => router.push('/plugins')} />
+        <Row icon="puzzlepiece.extension.fill" title={s.prTools} subtitle={s.prToolsBody} chevron onPress={() => router.push('/plugins')} />
         <Divider />
         <Row icon="brain.head.profile" title={s.prMemory} chevron onPress={() => router.push('/memory')} />
       </Group>

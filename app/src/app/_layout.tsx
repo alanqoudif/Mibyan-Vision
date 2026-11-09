@@ -11,7 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { ToastProvider } from '@/components/ui';
-import { Palettes, useScheme } from '@/constants/theme';
+import { useColors, useScheme } from '@/constants/theme';
 import { SettingsProvider } from '@/lib/settings';
 import { useExternalRoutes } from '@/lib/shortcuts';
 import { useSixthBootstrap } from '@/lib/sixth';
@@ -41,7 +41,7 @@ export default function RootLayout() {
 
 function Shell() {
   const scheme = useScheme();
-  const c = Palettes[scheme];
+  const c = useColors();
   const s = useS();
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   useSixthBootstrap();
@@ -67,6 +67,8 @@ function Shell() {
           <Stack.Screen name="senses" options={pushed('')} />
           <Stack.Screen name="glasses" options={pushed('')} />
           <Stack.Screen name="activity" options={pushed('')} />
+          <Stack.Screen name="shortcuts" options={pushed('')} />
+          <Stack.Screen name="personalize" options={pushed('')} />
           <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="session" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />

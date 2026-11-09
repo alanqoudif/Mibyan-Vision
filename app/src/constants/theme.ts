@@ -9,7 +9,7 @@ import '@/global.css';
 
 import { Platform, useColorScheme, useWindowDimensions } from 'react-native';
 
-import { useSettings } from '@/lib/settings';
+import { useSettings, type Accent } from '@/lib/settings';
 
 const light = {
   background: '#F6F5FB',
@@ -68,8 +68,26 @@ export function useScheme(): 'light' | 'dark' {
   return settings.appearance;
 }
 
+/**
+ * The accent the user picked in Personalization. Each pair is checked: white on `accent` and
+ * `accentText` on background and surface stay at or above 4.5:1 in both modes.
+ */
+export const Accents: Record<Accent, { light: [string, string]; dark: [string, string]; swatch: string }> = {
+  violet: { light: ['#6D3FE0', '#5B2FCB'], dark: ['#7C4DEB', '#A78BFA'], swatch: '#7C4DEB' },
+  blue: { light: ['#1F5FD0', '#1A54BC'], dark: ['#2F6BDB', '#86B4FF'], swatch: '#2F6BDB' },
+  teal: { light: ['#0A766A', '#08665C'], dark: ['#0B7468', '#4CD3C2'], swatch: '#14A394' },
+  amber: { light: ['#9C4F00', '#8A4500'], dark: ['#A05300', '#F6B65A'], swatch: '#E08A1E' },
+  rose: { light: ['#C0185A', '#AD154F'], dark: ['#C21F5C', '#FF8DB4'], swatch: '#E0407A' },
+};
+
 export function useColors(): Palette {
-  return Palettes[useScheme()];
+  const scheme = useScheme();
+  const { settings } = useSettings();
+  const base = Palettes[scheme];
+  const a = Accents[settings.accent] ?? Accents.violet;
+  if (settings.accent === 'violet' || !Accents[settings.accent]) return base;
+  const [accent, accentText] = a[scheme];
+  return { ...base, accent, accentText, glow: a.swatch };
 }
 
 /** The Sense Orb gradient: violet → indigo → cyan. */

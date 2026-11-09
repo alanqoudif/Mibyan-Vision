@@ -3,6 +3,8 @@ import * as Haptics from 'expo-haptics';
 import { useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SymbolView, type SFSymbol } from 'expo-symbols';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AttachSheet } from '@/components/chat/attach-sheet';
@@ -11,11 +13,10 @@ import { Composer } from '@/components/chat/composer';
 import { MessageView } from '@/components/chat/message-view';
 import { Sidebar } from '@/components/chat/sidebar';
 import { CircleButton } from '@/components/chrome';
-import { SenseOrb } from '@/components/sense-orb';
 import { Text } from '@/components/text';
-import { MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
+import { MinTouch, Radius, SmallTouch, Spacing, useColors } from '@/constants/theme';
 import { parseTags, splitAnswer, streamAssist, visibleText, type AssistRequest, type Turn } from '@/lib/assist';
-import { capabilities, capabilityFor, type Capability } from '@/lib/capabilities';
+import { capabilities, capabilityFor, resolveShortcuts, type Capability, type ResolvedShortcut } from '@/lib/capabilities';
 import { useChatS } from '@/lib/chat-strings';
 import { appendMessage, newId, patchMessage, useChats, type ChatMessage, type ToolUse } from '@/lib/chats';
 import { matchMode, matchRoute } from '@/lib/commands';
@@ -63,12 +64,12 @@ export default function ChatScreen() {
   const chat = chats.find((x) => x.id === chatId);
   const messages = useMemo(() => chat?.messages ?? [], [chat]);
   const tools = useMemo(() => capabilities(lang, settings.enabledTools), [lang, settings.enabledTools]);
-
-  useEffect(() => {
-    if (!settings.sixthOnboarded) router.push('/onboarding');
-    // First mount only; onboarding sets the flag itself.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const shortcuts = useMemo(() => resolveShortcuts(settings.shortcuts, lang, settings.enabledTools), [settings.shortcuts, lang, settings.enabledTools]);
+  const runShortcut = (r: ResolvedShortcut) => {
+    Haptics.selectionAsync();
+    if (r.cap) openCapability(r.cap);
+    else if (r.shortcut.text) send(r.shortcut.text);
+  };
 
   useEffect(
     () => () => {
@@ -269,15 +270,12 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {empty ? (
-          <View style={styles.empty}>
-            <SenseOrb size={88} state={glassesOn ? 'connected' : 'idle'} />
-            <Text variant="title" center accessibilityRole="header">
+          <Animated.View entering={FadeIn.duration(420)} style={styles.empty}>
+            <Text variant="display" accessibilityRole="header">
               {cs.emptyTitle(settings.name)}
             </Text>
-            <Text tone="secondary" center>
-              {cs.emptyBody}
-            </Text>
-          </View>
+            <Text tone="secondary">{cs.emptyBody}</Text>
+          </Animated.View>
         ) : (
           <ScrollView
             ref={scroll}
@@ -305,23 +303,12 @@ export default function ChatScreen() {
 
         <View style={{ paddingHorizontal: Spacing.three, paddingBottom: insets.bottom + Spacing.two, gap: Spacing.two }}>
           {empty && !input ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.two }} keyboardShouldPersistTaps="handled">
-              {cs.suggestions.map((sg) => (
-                <Pressable
-                  key={sg.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${sg.title}. ${sg.sub}`}
-                  onPress={() => send(sg.text)}
-                  style={({ pressed }) => [styles.suggestion, { backgroundColor: c.surface, borderColor: c.border, opacity: pressed ? 0.6 : 1 }]}>
-                  <Text variant="heading" numberOfLines={1}>
-                    {sg.title}
-                  </Text>
-                  <Text variant="caption" tone="secondary" numberOfLines={1}>
-                    {sg.sub}
-                  </Text>
-                </Pressable>
+            <View style={styles.shortcuts} accessibilityLabel={cs.shortcuts}>
+              {shortcuts.map((r) => (
+                <ShortcutChip key={r.shortcut.id} icon={r.icon} label={r.label} onPress={() => runShortcut(r)} />
               ))}
-            </ScrollView>
+              <ShortcutChip icon="slider.horizontal.3" label={shortcuts.length ? cs.editShortcuts : cs.addTool} quiet onPress={() => router.push('/shortcuts')} />
+            </View>
           ) : null}
           <Composer
             value={input}
@@ -372,13 +359,43 @@ export default function ChatScreen() {
   );
 }
 
+function ShortcutChip({ icon, label, onPress, quiet }: { icon: SFSymbol; label: string; onPress: () => void; quiet?: boolean }) {
+  const c = useColors();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        quiet ? { borderColor: c.border, borderStyle: 'dashed', borderWidth: 1 } : { backgroundColor: c.surface, borderColor: c.border },
+        { opacity: pressed ? 0.6 : 1 },
+      ]}>
+      <SymbolView name={icon} size={18} tintColor={quiet ? c.textSecondary : c.accentText} weight="medium" />
+      <Text variant="caption" tone={quiet ? 'secondary' : 'primary'} numberOfLines={1} style={{ flexShrink: 1 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
   titleWrap: { flex: 1, alignItems: 'center', minHeight: MinTouch, justifyContent: 'center' },
   status: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, paddingHorizontal: Spacing.five },
+  empty: { flex: 1, justifyContent: 'flex-end', gap: Spacing.two, paddingHorizontal: Spacing.four, paddingBottom: Spacing.five },
   list: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.four, gap: Spacing.four },
-  suggestion: { width: 200, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 2, gap: 2 },
+  shortcuts: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: SmallTouch,
+    maxWidth: '100%',
+    paddingHorizontal: Spacing.three,
+    borderRadius: Radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
 });
