@@ -1,9 +1,11 @@
 import type { ModeId } from '@/lib/modes';
 
 /** Spoken commands the app acts on itself, read from the transcribed question. */
-export type Command = 'stop' | 'brief' | 'detail';
+export type Command = 'stop' | 'resume' | 'brief' | 'detail';
 
 const STOP = /^(خلاص|وقف|اوقف|اسكت|بس|كفايه|كفى|يكفي|stop|enough|be quiet|quiet|that'?s enough|ok stop)$/;
+/** After cutting an answer off: "carry on from where you stopped". */
+const RESUME = /^(كمل|كملي|كمل كلامك|كمل اللي كنت تقوله|استمر|واصل|كمل القراءه|continue|go on|keep going|carry on|resume)$/;
 const BRIEF = /(باختصار|اختصر|مختصر|briefly|shorter|in short|be brief)/;
 const DETAIL = /(بالتفصيل|فصل|تفاصيل اكثر|more detail|in detail|elaborate)/;
 
@@ -19,10 +21,21 @@ function normalize(text: string) {
     .trim();
 }
 
+const CHANGES_TASK = /(بالانجليزي|بالانقليزي|بالعربي|بالفرنسي|بالاوردو|ترجم|لغه|من البدايه|من الاول|عيد|بدل|غير الموضوع|اختصر|باختصار|بالتفصيل|english|arabic|french|urdu|translat|language|start over|from the (start|beginning)|again|instead|skip|shorter|in detail)/;
+
+/**
+ * After cutting an answer off with a question: does the question replace the old answer
+ * ("read it in English instead", "start over")? If not, the old answer resumes after it.
+ */
+export function changesTask(question: string): boolean {
+  return CHANGES_TASK.test(normalize(question));
+}
+
 /** "Stop" only counts on its own, so "stop sign ahead?" is still a question. */
 export function matchCommand(question: string): Command | null {
   const q = normalize(question);
   if (STOP.test(q) || STOP.test(q.replace(/^(يا )?مبيان /, ''))) return 'stop';
+  if (RESUME.test(q) || RESUME.test(q.replace(/^(يا )?مبيان /, ''))) return 'resume';
   if (BRIEF.test(q)) return 'brief';
   if (DETAIL.test(q)) return 'detail';
   return null;
@@ -57,14 +70,36 @@ export function matchMode(question: string): (typeof INTENTS)[number][0] | null 
 
 const QIBLA = /(القبله|اتجاه الكعبه|qibla)/;
 const LIVE = /(الوضع المباشر|راقب معي|live mode|watch with me)/;
-const WHERE = /(وين انا|فين انا|where am i)/;
+const WHERE = /(وين انا|فين انا|وين موقعي|وش موقعي|ايش موقعي|موقعي الحين|where am i|my location|where is this)/;
+
+/** Kinds of place "the nearest …" can ask for; see lib/nearby for the search behind each. */
+export type PlaceKind = 'restaurant' | 'cafe' | 'pharmacy' | 'mosque' | 'hospital' | 'atm' | 'fuel' | 'grocery';
+
+const NEAR = /(اقرب|قريب|جنبي|حولي|حوالي|وين فيه|وين القى|nearest|closest|near me|nearby|around here|where can i find)/;
+const KINDS: [PlaceKind, RegExp][] = [
+  ['pharmacy', /(صيدليه|صيدليات|pharmac)/],
+  ['hospital', /(مستشفي|مستشفيات|مستوصف|عياده|طوارئ|hospital|clinic|emergency room)/],
+  ['mosque', /(مسجد|مساجد|جامع|مصلي|mosque|masjid)/],
+  ['cafe', /(قهوه|كوفي|مقهي|كافيه|كافي|cafe|coffee)/],
+  ['atm', /(صراف|بنك|atm|cash machine|bank)/],
+  ['fuel', /(محطه|بنزين|وقود|gas station|petrol|fuel)/],
+  ['grocery', /(بقاله|سوبرماركت|سوبر ماركت|تموينات|هايبر|supermarket|grocery|groceries)/],
+  ['restaurant', /(مطعم|مطاعم|اكل|غدا|عشا|فطور|restaurant|food|eat|lunch|dinner)/],
+];
+
+/** "Nearest pharmacy", "is there a restaurant near me": the kind of place, if the question is one. */
+export function matchNearby(question: string): PlaceKind | null {
+  const q = normalize(question).replace(/^(يا )?مبيان /, '');
+  if (!NEAR.test(q)) return null;
+  return KINDS.find(([, re]) => re.test(q))?.[0] ?? null;
+}
 const CALL = /^(اتصل|اتصلي|كلم|نادي|call|ring|get)\s+(.+)$/;
 const ANYONE = /(احد|حد|someone|anyone|somebody|help)/;
 
 export type SpokenRoute =
   | { pathname: '/qibla' }
   | { pathname: '/live' }
-  | { pathname: '/session'; params: { mode: 'where' } }
+  | { pathname: '/place'; params: { kind: 'where' | PlaceKind; q?: string } }
   | { pathname: '/helper'; params: { notify: string } }
   | { dial: string };
 
@@ -89,6 +124,8 @@ export function matchRoute(
   }
   if (QIBLA.test(q)) return { pathname: '/qibla' };
   if (LIVE.test(q)) return { pathname: '/live' };
-  if (WHERE.test(q)) return { pathname: '/session', params: { mode: 'where' } };
+  const near = matchNearby(question);
+  if (near) return { pathname: '/place', params: { kind: near, q: question } };
+  if (WHERE.test(q)) return { pathname: '/place', params: { kind: 'where' } };
   return null;
 }

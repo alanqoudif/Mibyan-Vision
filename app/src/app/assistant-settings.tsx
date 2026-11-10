@@ -159,8 +159,8 @@ export default function AssistantSettingsScreen() {
               icon="accessibility"
               label={t.voiceOverSetting}
               hint={t.voiceOverHint}
-              value={settings.voiceOver}
-              onChange={(voiceOver) => update({ voiceOver })}
+              value={settings.voice === 'voiceover'}
+              onChange={(on) => update({ voice: on ? 'voiceover' : 'ai' })}
             />
             <Divider />
             <View style={rows.pad}>
@@ -179,8 +179,8 @@ export default function AssistantSettingsScreen() {
               icon="hand.raised"
               label={t.bargeIn}
               hint={`${t.bargeInHint}. ${t.voiceCommandsHint}`}
-              value={settings.bargeIn}
-              onChange={(bargeIn) => update({ bargeIn })}
+              value={settings.interrupt}
+              onChange={(interrupt) => update({ interrupt })}
             />
             <Divider />
             <ToggleRow

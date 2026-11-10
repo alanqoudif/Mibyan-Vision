@@ -89,6 +89,14 @@ final class LiveSession {
   }
 
   /// A phone-camera frame (base64 JPEG), used when the glasses aren't sending video.
+  /// Answers a `toolCall`: `json` is `{"functionResponses": [{id, name, response}]}`.
+  func respondToTools(_ json: String) {
+    guard running, let socket, let data = json.data(using: .utf8),
+      let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    else { return }
+    send(["toolResponse": body], on: socket)
+  }
+
   func sendPhoneFrame(_ base64: String) {
     guard let data = Data(base64Encoded: base64) else { return }
     phoneFrame = (data, Date())
@@ -131,7 +139,8 @@ final class LiveSession {
     request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
     request.setValue(config.apiKey, forHTTPHeaderField: "apikey")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.httpBody = Self.json(["lang": config.lang, "directions": config.directions]).data(using: .utf8)
+    // `tools`: this build answers location tool calls (see `respondToTools`).
+    request.httpBody = Self.json(["lang": config.lang, "directions": config.directions, "tools": true]).data(using: .utf8)
     let (data, response) = try await URLSession.shared.data(for: request)
     let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
     guard (response as? HTTPURLResponse)?.statusCode == 200,
@@ -200,6 +209,11 @@ final class LiveSession {
       socket?.cancel(with: .normalClosure, reason: nil)
       socket = nil
       Task { await connect() }
+      return
+    }
+    // Gemini wants data only the phone has (where the user is, places nearby): JS answers it.
+    if let toolCall = message["toolCall"] as? [String: Any], let calls = toolCall["functionCalls"] as? [[String: Any]] {
+      emit(["type": "toolCall", "calls": calls])
       return
     }
     guard let content = message["serverContent"] as? [String: Any] else { return }

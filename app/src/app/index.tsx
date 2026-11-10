@@ -20,6 +20,7 @@ import { capabilities, capabilityFor, resolveShortcuts, type Capability, type Re
 import { useChatS } from '@/lib/chat-strings';
 import { appendMessage, newId, patchMessage, useChats, type ChatMessage, type ToolUse } from '@/lib/chats';
 import { matchMode, matchRoute } from '@/lib/commands';
+import { KINDS } from '@/lib/nearby';
 import { dial, phoneIn } from '@/lib/emergency';
 import { captureFromGlasses, useGlasses } from '@/lib/glasses';
 import { contactIn } from '@/lib/helper';
@@ -185,12 +186,19 @@ export default function ChatScreen() {
         dial(route.dial);
         return;
       }
+      if (route && route.pathname === '/place' && route.params.kind !== 'where') {
+        // "Nearest restaurant": no tool switch needed, it's just a search around the user.
+        const k = KINDS[route.params.kind];
+        toolNote({ id: `near-${route.params.kind}`, label: lang === 'ar' ? `أقرب ${k.ar.one}` : `Nearest ${k.en.one}`, icon: k.icon });
+        router.push({ pathname: '/place', params: { ...route.params, cid } });
+        return;
+      }
       if (route) {
         const id = route.pathname === '/qibla' ? 'qibla' : route.pathname === '/live' ? 'live' : route.pathname === '/helper' ? 'helper' : 'where';
         const cap = capabilityFor(id, lang, settings.enabledTools);
         if (cap) {
           toolNote({ id: cap.id, label: cap.label, icon: cap.icon });
-          router.push(route as Href);
+          router.push(route.pathname === '/place' ? { pathname: '/place', params: { ...route.params, cid } } : (route as Href));
           return;
         }
       }
@@ -286,6 +294,7 @@ export default function ChatScreen() {
             onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
             {messages.map((m) => {
               const cap = m.tool ? capabilityFor(m.tool.id, lang, settings.enabledTools) : undefined;
+              const nearKind = m.tool?.id.startsWith('near-') ? m.tool.id.slice(5) : undefined;
               return (
                 <MessageView
                   key={m.id}
@@ -294,7 +303,13 @@ export default function ChatScreen() {
                   speaking={m.id === speakingId}
                   onSpeak={m.role === 'assistant' && m.text ? () => speak(m) : undefined}
                   onRetry={m.error ? () => retry(m) : undefined}
-                  onOpenTool={cap ? () => router.push(cap.href()) : undefined}
+                  onOpenTool={
+                    cap
+                      ? () => router.push(cap.href())
+                      : nearKind
+                        ? () => router.push({ pathname: '/place', params: { kind: nearKind } })
+                        : undefined
+                  }
                 />
               );
             })}
@@ -320,6 +335,7 @@ export default function ChatScreen() {
             onStop={stop}
             onPlus={() => setPlusOpen(true)}
             onVoice={() => router.push({ pathname: '/session', params: { mode: 'ask' } })}
+            onLive={settings.enabledTools.includes('live') ? () => router.push('/live') : undefined}
           />
         </View>
       </KeyboardAvoidingView>

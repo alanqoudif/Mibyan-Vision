@@ -21,7 +21,7 @@ export default function ShortcutsScreen() {
   const [label, setLabel] = useState('');
   const [text, setText] = useState('');
 
-  const list = settings.shortcuts;
+  const list = Array.isArray(settings.shortcuts) ? settings.shortcuts : [];
   const shown = resolveShortcuts(list, lang, settings.enabledTools);
   const used = new Set(list.filter((s) => s.kind === 'tool').map((s) => s.tool));
   const addable = capabilities(lang, settings.enabledTools).filter((cap) => !used.has(cap.id));

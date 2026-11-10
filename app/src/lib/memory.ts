@@ -23,7 +23,8 @@ export type MemoryItem = {
 
 const MAX_REMEMBER = 100;
 const MAX_SEEN = 60;
-const DIR = new Directory(Paths.document, 'memory');
+// Made on first use: building the app evaluates this file where there's no file system.
+const dir = () => new Directory(Paths.document, 'memory');
 
 let items: MemoryItem[] = readJSON<MemoryItem[]>('memory', []);
 const listeners = new Set<(items: MemoryItem[]) => void>();
@@ -41,8 +42,8 @@ function key(label: string) {
 function savePhoto(id: string, base64?: string) {
   if (!base64) return undefined;
   try {
-    if (!DIR.exists) DIR.create();
-    const f = new File(DIR, `${id}.jpg`);
+    if (!dir().exists) dir().create();
+    const f = new File(dir(), `${id}.jpg`);
     f.create();
     f.write(base64, { encoding: 'base64' });
     return f.uri;

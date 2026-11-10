@@ -21,7 +21,9 @@ export type Chat = { id: string; title: string; updatedAt: number; messages: Cha
 const FILE = 'chats';
 const MAX_CHATS = 60;
 
-let chats: Chat[] = readJSON<Chat[]>(FILE, []);
+// Anything malformed on disk is dropped rather than crashing the chat screen.
+const saved = readJSON<unknown>(FILE, []);
+let chats: Chat[] = (Array.isArray(saved) ? saved : []).filter((c): c is Chat => !!c && Array.isArray((c as Chat).messages));
 const listeners = new Set<() => void>();
 
 function commit(next: Chat[], persist = true) {

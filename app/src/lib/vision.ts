@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useCallback, useEffect, useState } from 'react';
 import type { Permission, SenseManifest } from '@mibyan/shared/sense';
 
-import { supabase as mainClient } from '@/lib/supabase';
+import { supabase as mainClient, serverRender } from '@/lib/supabase';
 
 /**
  * Account data for Senses. Uses its own Supabase project when EXPO_PUBLIC_VISION_SUPABASE_URL /
@@ -13,7 +13,7 @@ const url = process.env.EXPO_PUBLIC_VISION_SUPABASE_URL;
 const key = process.env.EXPO_PUBLIC_VISION_SUPABASE_ANON_KEY;
 const separate = !!(url && key);
 export const visionClient = separate
-  ? createClient(url!, key!, { auth: { storage: AsyncStorage, storageKey: 'vision-auth', autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } })
+  ? createClient(url!, key!, { auth: serverRender ? { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } : { storage: AsyncStorage, storageKey: 'vision-auth', autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } })
   : mainClient;
 export const visionIsSeparate = separate;
 

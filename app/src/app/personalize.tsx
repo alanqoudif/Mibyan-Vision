@@ -84,6 +84,22 @@ export default function PersonalizeScreen() {
 
       <Group title={cs.voice}>
         <View style={styles.block}>
+          <Text variant="heading">{cs.voiceSource}</Text>
+          <Segmented
+            value={settings.voice}
+            options={[{ id: 'ai', label: cs.voiceAi }, { id: 'voiceover', label: cs.voiceVO }]}
+            onChange={(voice) => {
+              update({ voice });
+              Voice.setPreferScreenReader(voice === 'voiceover');
+              tryVoice();
+            }}
+          />
+          <Text variant="caption" tone="secondary">
+            {cs.voiceSourceHint}
+          </Text>
+        </View>
+        <Divider />
+        <View style={styles.block}>
           <Text variant="heading">{cs.speed}</Text>
           <Segmented
             value={settings.speed}

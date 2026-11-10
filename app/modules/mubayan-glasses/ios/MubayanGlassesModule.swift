@@ -103,6 +103,14 @@ public class MubayanGlassesModule: Module {
       try await TextReader.read(uri, languages: languages)
     }
 
+    AsyncFunction("liveToolResponse") { (json: String) async in
+      await LiveSession.shared.respondToTools(json)
+    }
+
+    AsyncFunction("searchPlaces") { (query: String, categories: [String], latitude: Double, longitude: Double, radius: Double) async throws -> [[String: Any]] in
+      try await PlaceSearch.search(query: query, categories: categories, latitude: latitude, longitude: longitude, radius: radius)
+    }
+
     /// The route a shortcut asked for, once: reading it clears it.
     Function("takePendingShortcut") { () -> String? in
       let defaults = UserDefaults.standard

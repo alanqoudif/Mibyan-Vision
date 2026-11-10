@@ -18,10 +18,12 @@ type Props = {
   onStop: () => void;
   onPlus: () => void;
   onVoice: () => void;
+  /** Live mode: camera and voice together, it watches and talks with you. */
+  onLive?: () => void;
 };
 
 /** One rounded box: "+" on the start side, the text, then send, or voice mode while it's empty. */
-export function Composer({ value, onChange, photo, onRemovePhoto, busy, onSend, onStop, onPlus, onVoice }: Props) {
+export function Composer({ value, onChange, photo, onRemovePhoto, busy, onSend, onStop, onPlus, onVoice, onLive }: Props) {
   const c = useColors();
   const cs = useChatS();
   const { dir } = useI18n();
@@ -57,6 +59,7 @@ export function Composer({ value, onChange, photo, onRemovePhoto, busy, onSend, 
       <View style={styles.bar}>
         <Round icon="plus" label={cs.attach} onPress={onPlus} />
         <View style={{ flex: 1 }} />
+        {onLive && !busy && !canSend ? <Round icon="eye" label={cs.live} hint={cs.liveHint} onPress={onLive} /> : null}
         {busy ? (
           <Round icon="stop.fill" label={cs.stop} onPress={onStop} solid />
         ) : canSend ? (

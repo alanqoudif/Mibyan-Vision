@@ -26,12 +26,16 @@ export type Settings = {
   framing: boolean;
   /** Keep the mic open while answering so "stop" / a new question cuts the answer off. */
   bargeIn: boolean;
+  /** Talking over an answer stops it to listen; "continue" picks it up where it stopped. */
+  interrupt: boolean;
   /** Name people the user enrolled. Only offered when FACES_ALLOWED (see lib/faces). */
   faces: boolean;
   /** "Chair at 2 o'clock, 3 steps" (O&M style) or plain left/right. */
   directions: 'clock' | 'simple';
   /** With VoiceOver on, speak answers through VoiceOver (its voice and rate) instead of the app's. */
   voiceOver: boolean;
+  /** Whose voice reads answers: the app's AI voice, or VoiceOver's (when VoiceOver is on). */
+  voice: 'ai' | 'voiceover';
   /** What the assistant calls the user, asked during onboarding. */
   name: string;
   /** The first-launch voice setup has run (or was skipped). */
@@ -82,9 +86,11 @@ const DEFAULTS: Settings = {
   sounds: true,
   framing: true,
   bargeIn: false,
+  interrupt: true,
   faces: false,
   directions: 'clock',
   voiceOver: true,
+  voice: 'ai',
   name: '',
   onboarded: false,
   appearance: 'dark',
@@ -147,7 +153,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [settings, syncOwner, syncReady]);
   useEffect(() => Earcons.setEnabled(settings.sounds), [settings.sounds]);
-  useEffect(() => Voice.setPreferScreenReader(settings.voiceOver), [settings.voiceOver]);
+  useEffect(() => Voice.setPreferScreenReader(settings.voice === 'voiceover'), [settings.voice]);
   const update = (patch: Partial<Settings>) =>
     setSettings((s) => {
       const next = { ...s, ...patch };

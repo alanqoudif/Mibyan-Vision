@@ -33,6 +33,7 @@ import { matchCommand } from '@/lib/commands';
 import * as Earcons from '@/lib/earcons';
 import { captureFromGlasses, stopGlasses, takeGlassesNotice, useCameraSource } from '@/lib/glasses';
 import { useI18n } from '@/lib/i18n';
+import { answerToolCalls } from '@/lib/live-tools';
 import { prepareMic } from '@/lib/listen';
 import { memoryNotes, recordTags } from '@/lib/memory';
 import { SPEECH_RATE, useSettings } from '@/lib/settings';
@@ -342,6 +343,19 @@ export default function LiveScreen() {
           if (urgent) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
+      } else if (e.type === 'toolCall') {
+        // "Where am I", "nearest pharmacy": real GPS and map data, which Gemini then says.
+        setOrb('thinking');
+        answerToolCalls(e.calls, lang, settings.directions === 'clock', async () => {
+          const fromGlasses = await captureFromGlasses().catch(() => undefined);
+          if (fromGlasses) return fromGlasses;
+          if (!cameraRef.current || !cameraReady.current) return undefined;
+          return (await cameraRef.current.takePictureAsync({ quality: 0.8, shutterSound: false }))?.uri;
+        })
+          .then((r) => {
+            if (alive.current) return Glasses?.liveToolResponse(JSON.stringify(r));
+          })
+          .catch((err) => console.warn('live tool failed', err));
       } else if (e.type === 'error') {
         console.warn('realtime live failed', e.message);
         // Never connected: use the frame-by-frame mode instead. Dropped later: say so.

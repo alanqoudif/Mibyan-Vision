@@ -57,7 +57,7 @@ export function capabilities(lang: Lang, enabled: ModeId[]): Capability[] {
       href: () => '/helper',
     },
   ];
-  const modes: Capability[] = SHEET_MODES.map((id) => {
+  const modes: Capability[] = SHEET_MODES.map((id): Capability => {
     const m = MODES.find((x) => x.id === id)!;
     const txt = modeText(m, lang);
     return {
@@ -65,7 +65,8 @@ export function capabilities(lang: Lang, enabled: ModeId[]): Capability[] {
       icon: m.icon,
       label: txt.title,
       hint: txt.prompt,
-      href: (q?: string) => ({ pathname: '/session', params: q ? { mode: id, q } : { mode: id } }),
+      // "Where am I" is the map with a spoken address; it offers the camera from there.
+      href: (q?: string) => (id === 'where' ? { pathname: '/place', params: { kind: 'where' } } : { pathname: '/session', params: q ? { mode: id, q } : { mode: id } }),
       tool: id,
     };
   });
@@ -81,7 +82,8 @@ export type ResolvedShortcut = { shortcut: Shortcut; label: string; icon: SFSymb
 /** What a saved shortcut shows and does now. Tools that were switched off drop out. */
 export function resolveShortcuts(list: Shortcut[], lang: Lang, enabled: ModeId[]): ResolvedShortcut[] {
   const caps = capabilities(lang, enabled);
-  return list.flatMap((sc): ResolvedShortcut[] => {
+  // Settings synced from another device or an older build may not carry a list yet.
+  return (Array.isArray(list) ? list : []).flatMap((sc): ResolvedShortcut[] => {
     if (sc.kind === 'prompt') return sc.text?.trim() ? [{ shortcut: sc, label: sc.label || sc.text, icon: 'text.bubble' }] : [];
     const cap = caps.find((c) => c.id === sc.tool);
     return cap ? [{ shortcut: sc, label: sc.label || cap.label, icon: cap.icon, cap }] : [];

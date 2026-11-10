@@ -27,6 +27,7 @@ Pod::Spec.new do |s|
     products: ['MWDATCore', 'MWDATCamera']
   )
 
+  s.frameworks = 'MapKit'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.source_files = '**/*.swift'
   # Apple's Depth Anything V2 Small (Core ML, 8-bit palettized), precompiled, for ObstacleSensor.

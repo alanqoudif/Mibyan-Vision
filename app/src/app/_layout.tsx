@@ -48,6 +48,7 @@ function Shell() {
 
   const pushed = (title: string) => ({
     headerShown: true,
+    presentation: 'card' as const,
     title,
     headerBackButtonDisplayMode: 'minimal' as const,
     headerTintColor: c.text,
@@ -73,6 +74,7 @@ function Shell() {
           <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="session" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="live" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="place" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="find" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="qibla" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="helper" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />

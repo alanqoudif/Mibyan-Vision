@@ -17,7 +17,8 @@ type CatalogFile = { id: string; object_path: string; file_name: string; mime_ty
 const blank = { name: '', strength: '', shelf: '', row: '', position: '' };
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const LOCAL_FILES = 'pharmacy-catalog-files';
-const LOCAL_DIR = new Directory(Paths.document, 'pharmacy-catalog');
+// Made on first use: building the app evaluates this file where there's no file system.
+const localDir = () => new Directory(Paths.document, 'pharmacy-catalog');
 
 export default function PharmacyScreen() {
   const router = useRouter(); const c = useColors(); const insets = useSafeAreaInsets(); const { t, dir } = useI18n();
@@ -61,8 +62,8 @@ export default function PharmacyScreen() {
           const { error: rowError } = await supabase.from('mata_pharmacy_files').insert({ owner_id: userId, object_path: objectPath, file_name: asset.name, mime_type: asset.mimeType || null, file_size: size });
           if (rowError) { await supabase.storage.from('mata-pharmacy-catalog').remove([objectPath]); throw rowError; }
         } else {
-          LOCAL_DIR.create({ idempotent: true, intermediates: true });
-          const localFile = new ExpoFile(LOCAL_DIR, `${id}-${safeName}`);
+          localDir().create({ idempotent: true, intermediates: true });
+          const localFile = new ExpoFile(localDir(), `${id}-${safeName}`);
           await new ExpoFile(asset.uri).copy(localFile);
           const current = readJSON<CatalogFile[]>(LOCAL_FILES, []);
           writeJSON(LOCAL_FILES, [...current, { id, object_path: localFile.uri, file_name: asset.name, mime_type: asset.mimeType || null, file_size: size, storage: 'local' }]);

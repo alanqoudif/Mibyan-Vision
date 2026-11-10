@@ -14,7 +14,8 @@ export type Med = { id: string; name: string; note: string; photo: string; at: n
 const MAX_MEDS = 12;
 /** Reference photos sent per check; more makes the request slow. */
 const MAX_REFS = 8;
-const DIR = new Directory(Paths.document, 'meds');
+// Made on first use: building the app evaluates this file where there's no file system.
+const dir = () => new Directory(Paths.document, 'meds');
 
 let meds: Med[] = readJSON<Med[]>('meds', []);
 const listeners = new Set<(m: Med[]) => void>();
@@ -32,9 +33,9 @@ function key(name: string) {
 /** Saves (or replaces, by name) a medicine with the photo it was shown in. */
 export function addMed(name: string, note: string, base64: string) {
   try {
-    if (!DIR.exists) DIR.create();
+    if (!dir().exists) dir().create();
     const id = `m${Date.now()}`;
-    const f = new File(DIR, `${id}.jpg`);
+    const f = new File(dir(), `${id}.jpg`);
     f.create();
     f.write(base64, { encoding: 'base64' });
     const k = key(name);

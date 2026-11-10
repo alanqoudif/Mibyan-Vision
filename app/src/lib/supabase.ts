@@ -27,8 +27,11 @@ const secureStorage: SupportedStorage = {
   },
 };
 
+/** Web pages are first rendered on the dev server, where there's no `window` or storage to keep a session in. */
+export const serverRender = Platform.OS === 'web' && typeof window === 'undefined';
+
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 export const supabase = url && anonKey
-  ? createClient(url, anonKey, { auth: { storage: Platform.OS === 'web' ? AsyncStorage : secureStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: Platform.OS === 'web', flowType: 'pkce' } })
+  ? createClient(url, anonKey, { auth: serverRender ? { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } : { storage: Platform.OS === 'web' ? AsyncStorage : secureStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: Platform.OS === 'web', flowType: 'pkce' } })
   : null;

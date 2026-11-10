@@ -17,7 +17,8 @@ export const FACES_ALLOWED = false;
 export type Face = { id: string; name: string; photo: string; at: number };
 
 const MAX_FACES = 5;
-const DIR = new Directory(Paths.document, 'faces');
+// Made on first use: building the app evaluates this file where there's no file system.
+const dir = () => new Directory(Paths.document, 'faces');
 
 let faces: Face[] = readJSON<Face[]>('faces', []);
 const listeners = new Set<(f: Face[]) => void>();
@@ -30,9 +31,9 @@ function commit(next: Face[]) {
 
 export function addFace(name: string, base64: string) {
   try {
-    if (!DIR.exists) DIR.create();
+    if (!dir().exists) dir().create();
     const id = `f${Date.now()}`;
-    const f = new File(DIR, `${id}.jpg`);
+    const f = new File(dir(), `${id}.jpg`);
     f.create();
     f.write(base64, { encoding: 'base64' });
     const replaced = faces.filter((x) => x.name === name);
