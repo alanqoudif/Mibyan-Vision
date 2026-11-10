@@ -11,7 +11,8 @@ const FETCH_TIMEOUT_MS = 8000;
 
 export type SpeakOptions = { language?: string; rate?: number; onDone?: () => void };
 
-type Item = { text: string; opts: SpeakOptions; clip: Promise<File | null> };
+/** `now`: a `speakNow` line, whose `onDone` still fires when it's cut off (callers await it). */
+type Item = { text: string; opts: SpeakOptions; clip: Promise<File | null>; now?: boolean };
 
 /**
  * Natural cloud voice (the `mata-tts` edge function) with the device voice as fallback.
@@ -23,7 +24,8 @@ type Item = { text: string; opts: SpeakOptions; clip: Promise<File | null> };
 // blind users tune, would be ignored). So answers go out as VoiceOver announcements instead.
 
 let screenReader = false;
-let preferScreenReader = true;
+// The app's own AI voice by default; VoiceOver's voice only when the user picks it.
+let preferScreenReader = false;
 AccessibilityInfo.isScreenReaderEnabled().then((on) => (screenReader = on));
 AccessibilityInfo.addEventListener('screenReaderChanged', (on) => (screenReader = on));
 
@@ -80,21 +82,31 @@ Speech.getAvailableVoicesAsync()
   })
   .catch(() => {});
 
+/** The backup voice follows the text, so English read on request isn't spoken by the Arabic voice. */
+function languageOf(text: string, wanted = 'ar-SA') {
+  const arabic = (text.match(/[\u0600-\u06FF]/g) ?? []).length;
+  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+  if (arabic > latin) return wanted.startsWith('ar') ? wanted : 'ar-SA';
+  if (latin > arabic) return wanted.startsWith('ar') ? 'en-US' : wanted;
+  return wanted;
+}
+
 function deviceSpeak(text: string, opts: SpeakOptions, done: () => void) {
-  const language = opts.language ?? 'ar-SA';
+  const language = languageOf(text, opts.language);
   const voice = bestVoices[language.slice(0, 2)];
   Speech.speak(text, { language, voice, rate: opts.rate, onDone: done, onStopped: done, onError: done });
 }
 
 /**
- * The device voice, which starts instantly: for short live-mode and guidance lines.
- * `interrupt` cuts off whatever is being said first.
+ * Short guidance and live-mode lines ("turn a little right"): the same AI voice as answers,
+ * cut in front of the queue. These phrases repeat a lot, so their clips are kept and replay
+ * instantly. `interrupt` cuts off whatever is being said first.
  */
 export function speakNow(text: string, opts: SpeakOptions & { interrupt?: boolean } = {}) {
   if (opts.interrupt) stop();
   if (viaScreenReader()) return announce(text, opts.onDone);
-  const done = () => opts.onDone?.();
-  deviceSpeak(text, opts, done);
+  queue.unshift({ text, opts, clip: fetchClip(text, opts.rate ?? 1, true), now: true });
+  if (!busy) next();
 }
 
 // ---------- cloud voice ----------
@@ -105,6 +117,12 @@ let queue: Item[] = [];
 let busy = false;
 let player: AudioPlayer | null = null;
 let onClipEnd: (() => void) | null = null;
+let current: Item | null = null;
+
+// Clips of short repeated lines, by rate and text.
+const CACHE_MAX = 60;
+const cache = new Map<string, File>();
+const cached = new Set<string>();
 
 function getPlayer() {
   if (!player) {
@@ -120,7 +138,10 @@ function getPlayer() {
   return player;
 }
 
-async function fetchClip(text: string, rate: number): Promise<File | null> {
+async function fetchClip(text: string, rate: number, keep = false): Promise<File | null> {
+  const key = `${rate}|${text}`;
+  const hit = cache.get(key);
+  if (hit?.exists) return hit;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -133,6 +154,18 @@ async function fetchClip(text: string, rate: number): Promise<File | null> {
     if (!res.ok) throw new Error(`tts ${res.status}`);
     const file = new File(Paths.cache, `tts-${++seq}.mp3`);
     await file.write(new Uint8Array(await res.arrayBuffer()));
+    if (keep && text.length <= 120) {
+      cache.set(key, file);
+      cached.add(file.uri);
+      if (cache.size > CACHE_MAX) {
+        const [oldKey, old] = cache.entries().next().value!;
+        cache.delete(oldKey);
+        cached.delete(old.uri);
+        try {
+          old.delete();
+        } catch {}
+      }
+    }
     return file;
   } catch (e) {
     console.warn('cloud voice failed, using device voice', e);
@@ -150,6 +183,7 @@ function release() {
 }
 
 function discard(file: File | null) {
+  if (file && cached.has(file.uri)) return;
   try {
     file?.delete();
   } catch {}
@@ -157,6 +191,7 @@ function discard(file: File | null) {
 
 async function next() {
   const item = queue.shift();
+  current = item ?? null;
   if (!item) {
     busy = false;
     release();
@@ -196,8 +231,11 @@ export function speak(text: string, opts: SpeakOptions = {}) {
  */
 export function stop() {
   gen += 1;
+  const cut = [current, ...queue].filter((i): i is Item => !!i?.now);
   for (const item of queue) item.clip.then(discard);
   queue = [];
+  current = null;
+  cut.forEach((i) => i.opts.onDone?.());
   busy = false;
   release();
   Speech.stop();

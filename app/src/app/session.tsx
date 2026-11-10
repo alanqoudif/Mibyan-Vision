@@ -22,7 +22,7 @@ import { Orb, type OrbState } from '@/components/orb';
 import { Text } from '@/components/text';
 import { Radius, Spacing, useColors, useGraphicSize } from '@/constants/theme';
 import { parseTags, splitAnswer, streamAssist, visibleText, type AssistRequest, type Turn } from '@/lib/assist';
-import { matchCommand, matchMode, matchRoute } from '@/lib/commands';
+import { changesTask, matchCommand, matchMode, matchRoute } from '@/lib/commands';
 import { dial, phoneIn } from '@/lib/emergency';
 import * as Earcons from '@/lib/earcons';
 import { FACES_ALLOWED, addFace, faceRefs } from '@/lib/faces';
@@ -131,6 +131,12 @@ export default function SessionScreen() {
   const detailOverride = useRef<boolean | null>(null);
   const lastImage = useRef<string | undefined>(undefined);
   const listenRef = useRef<(quiet?: boolean) => void>(() => {});
+  /** How much of the answer has actually been said aloud, and the whole answer. */
+  const heardUpTo = useRef(0);
+  const lastAnswer = useRef('');
+  /** Set when the user talked over an answer: what it was and where it was cut, for "continue". */
+  const interrupted = useRef<{ full: string; at: number; turn: number } | null>(null);
+  const resumeRef = useRef<(cue?: boolean) => void>(() => {});
 
   const haptic = (style = Haptics.ImpactFeedbackStyle.Light) => {
     if (settings.haptics) Haptics.impactAsync(style);
@@ -210,7 +216,7 @@ export default function SessionScreen() {
 
   /** Opens the mic before the answer plays, so the user can cut it off by talking. */
   const startBarge = useCallback(async () => {
-    if (!settings.bargeIn || barging.current) return;
+    if (!settings.interrupt || barging.current) return;
     try {
       const perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) return;
@@ -221,13 +227,18 @@ export default function SessionScreen() {
     } catch (e) {
       console.warn('barge-in mic failed', e);
     }
-  }, [recorder, settings.bargeIn]);
+  }, [recorder, settings.interrupt]);
 
   // ---------- speech out ----------
   const onAnswerFinished = useCallback(async () => {
     if (!alive.current) return;
     await stopBarge();
     setPhase('idle');
+    // The side question is answered: go back to the answer it interrupted.
+    if (interrupted.current) {
+      setTimeout(() => alive.current && resumeRef.current(true), 350);
+      return;
+    }
     if (settings.continuous && conversational) {
       // In one-shot modes, listening for a follow-up is a bonus: stay quiet if none comes.
       setTimeout(() => alive.current && listenRef.current(mode.id !== 'ask'), 450);
@@ -242,6 +253,7 @@ export default function SessionScreen() {
       const finish = () => {
         if (myGen !== gen.current) return;
         setSpokenUpTo((v) => Math.max(v, start + chunk.length));
+        heardUpTo.current = Math.max(heardUpTo.current, start + chunk.length);
         outstanding.current -= 1;
         if (outstanding.current <= 0 && streamDone.current) onAnswerFinished();
       };
@@ -286,6 +298,7 @@ export default function SessionScreen() {
       const ctrl = new AbortController();
       abort.current = ctrl;
       spoken.current = 0;
+      heardUpTo.current = 0;
       outstanding.current = 0;
       streamDone.current = false;
       lastImage.current = req.image;
@@ -333,18 +346,26 @@ export default function SessionScreen() {
               commandSeen = true;
               const cmd = matchCommand(s.question);
               if (cmd === 'stop') {
+                interrupted.current = null;
                 silence();
                 stopBarge();
                 setAnswer('');
                 setPhase('idle');
                 return;
               }
-              if (cmd) detailOverride.current = cmd === 'detail';
+              if (cmd === 'resume' && interrupted.current) {
+                resumeRef.current();
+                return;
+              }
+              // A side question after cutting the answer off is answered, then the old answer carries
+              // on by itself; a question that replaces it ("in English instead") drops it.
+              if (interrupted.current && (cmd === 'brief' || cmd === 'detail' || changesTask(s.question))) interrupted.current = null;
+              if (cmd === 'brief' || cmd === 'detail') detailOverride.current = cmd === 'detail';
               // "Where's the qibla?", "call mom to see with me": open that screen instead.
               const matchedRoute = matchRoute(s.question, (text) => contactIn(text)?.id, phoneIn);
               let route = matchedRoute;
               if (route && 'pathname' in route && route.pathname === '/live' && !settings.enabledTools.includes('live')) route = null;
-              if (route && 'pathname' in route && route.pathname === '/session' && !settings.enabledTools.includes('where')) route = null;
+              if (route && 'pathname' in route && route.pathname === '/place' && route.params.kind === 'where' && !settings.enabledTools.includes('where')) route = null;
               if (route && 'dial' in route) {
                 silence();
                 stopBarge();
@@ -353,7 +374,8 @@ export default function SessionScreen() {
                 dial(route.dial);
                 return;
               }
-              if (route && !(route.pathname === '/session' && mode.id === 'where')) {
+              // Already describing the surroundings with the camera: "where am I" is answered here, not on the map.
+              if (route && !(route.pathname === '/place' && route.params.kind === 'where' && mode.id === 'where')) {
                 silence();
                 stopBarge();
                 alive.current = false;
@@ -377,6 +399,7 @@ export default function SessionScreen() {
             }
             const shown = visibleText(s.answer);
             setAnswer(shown);
+            lastAnswer.current = shown;
             if (!s.pending) feedSpeech(shown, false);
           },
           ctrl.signal,
@@ -408,6 +431,7 @@ export default function SessionScreen() {
       const s = splitAnswer(raw);
       const shown = visibleText(s.answer).trim();
       setAnswer(shown);
+      lastAnswer.current = shown;
       streamDone.current = true;
       feedSpeech(shown, true);
       if (settings.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -425,6 +449,30 @@ export default function SessionScreen() {
     },
     [feedSpeech, mode.id, pluginId, prompt, onAnswerFinished, settings, lang, t, speechLang, silence, startBarge, stopBarge, router],
   );
+
+  /** "Continue": say the rest of the answer that was cut off, from the sentence it stopped in. */
+  const resumeAnswer = useCallback((cue = false) => {
+    const r = interrupted.current;
+    interrupted.current = null;
+    if (!r) return;
+    silence();
+    // After answering a side question, say where we're going back to.
+    if (cue) Voice.speak(lang === 'ar' ? 'نكمل.' : 'Continuing.', { language: speechLang, rate: SPEECH_RATE[settings.speed] });
+    lastAnswer.current = r.full;
+    setQuestion(null);
+    setAnswer(r.full);
+    setSpokenUpTo(r.at);
+    heardUpTo.current = r.at;
+    spoken.current = r.at;
+    outstanding.current = 0;
+    streamDone.current = true;
+    if (turns.current[r.turn]?.role === 'assistant') turns.current[r.turn].content = r.full;
+    startBarge();
+    feedSpeech(r.full, true);
+  }, [feedSpeech, lang, settings.speed, silence, speechLang, startBarge]);
+  useEffect(() => {
+    resumeRef.current = resumeAnswer;
+  }, [resumeAnswer]);
 
   // ---------- microphone ----------
   const startListening = useCallback(
@@ -476,6 +524,8 @@ export default function SessionScreen() {
 
     if (!vad.current.heard || !recorder.uri) {
       setPhase('idle');
+      // Talked over it but said nothing (a cough, the TV): pick up where it stopped.
+      if (interrupted.current) return resumeRef.current();
       if (!quietListen.current) {
         Voice.speak(t.didntHear, { language: speechLang, rate: SPEECH_RATE[settings.speed] });
       }
@@ -499,6 +549,16 @@ export default function SessionScreen() {
         v.loudSince ||= now;
         if (now - v.loudSince > BARGE_MS) {
           haptic(Haptics.ImpactFeedbackStyle.Medium);
+          // Remember where it was cut: "continue" resumes there, and a new question is answered
+          // knowing the user only heard this much.
+          const full = lastAnswer.current;
+          const at = heardUpTo.current;
+          if (full && at < full.length) {
+            const turn = turns.current.length - 1;
+            interrupted.current = { full, at, turn };
+            const last = turns.current[turn];
+            if (last?.role === 'assistant') last.content = `${full.slice(0, at).trim()} … ${lang === 'ar' ? '(قاطعني هنا وما سمع الباقي)' : '(they cut me off here and did not hear the rest)'}`;
+          }
           // A fresh recording, so the question doesn't include the answer's own voice.
           // "Stop" on its own is handled right here: nothing more is heard, so it goes quiet.
           listenRef.current(true);

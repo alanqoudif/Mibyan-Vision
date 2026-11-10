@@ -45,6 +45,11 @@ export function Shell({ children }: { children: ReactNode }) {
 function SignIn({ tr }: { tr: (a: string, e: string) => string }) {
   const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<{ kind: "err" | "good"; text: string } | null>(null); const [busy, setBusy] = useState(false);
+  const google = async () => {
+    setMsg(null);
+    const { error } = await getSupabase().auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/auth/callback?next=/studio` } });
+    if (error) setMsg({ kind: "err", text: error.message });
+  };
   const go = async (mode: "in" | "up") => {
     setBusy(true); setMsg(null);
     try {
@@ -62,6 +67,7 @@ function SignIn({ tr }: { tr: (a: string, e: string) => string }) {
       <label>{tr("البريد", "Email")}<input className="vs-in" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" /></label>
       <label>{tr("كلمة المرور", "Password")}<input className="vs-in" type="password" autoComplete="current-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" /></label>
       {msg && <div className={`vs-note ${msg.kind}`} role="alert">{msg.text}</div>}
+      <button className="vs-btn" type="button" disabled={busy} onClick={() => void google()}>{tr("المتابعة مع Google (حساب مبيان)", "Continue with Google (Mibyan account)")}</button>
       <div className="vs-row"><button className="vs-btn pri" disabled={busy} type="submit">{tr("دخول", "Sign in")}</button><button className="vs-btn" type="button" disabled={busy} onClick={() => void go("up")}>{tr("إنشاء حساب", "Create account")}</button></div>
     </form></main>
   );

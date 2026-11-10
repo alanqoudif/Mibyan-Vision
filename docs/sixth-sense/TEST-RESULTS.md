@@ -27,5 +27,7 @@ Caveat: the branch has no production data and a partial replay of production mig
 | Browser: landing (AR, dark) renders; `/studio` shows sign-in gate; no console errors | pass |
 | Browser (temporary no-auth preview, since removed): Composer Arabic → valid manifest → simulated run takes flagged branch; Handover excludes unconsented record, items link to sources | pass |
 | Signed-in Studio pages (marketplace install, my senses) in browser | NOT RUN: no test account created |
-| iOS simulator run of Senses screen | NOT RUN: simulator access not granted to Claude |
+| iOS dev build (`expo run:ios`, iPhone 17 simulator, iOS 27.2, Xcode 27.2) builds, installs, launches; original app home renders (glasses shown as Not connected) | pass |
+| Senses screen on simulator (opened via `mata://senses`): renders, signed-out state shows sign-in form for the dev-branch account | pass (SIMULATOR; no glasses) |
+| Senses screen signed-in: list from web account, enable/disable, Run | NOT RUN: needs a dev-branch test account created by the user |
 | Real glasses / OCR / record-saving adapters | NOT RUN / not built |

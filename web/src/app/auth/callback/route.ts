@@ -15,5 +15,8 @@ export async function GET(request: Request) {
     });
     await supabase.auth.exchangeCodeForSession(code);
   }
-  return NextResponse.redirect(new URL("/plugins", url.origin));
+  // Only same-site relative paths are allowed as the post-login destination.
+  const next = url.searchParams.get("next") ?? "";
+  const dest = next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/plugins";
+  return NextResponse.redirect(new URL(dest, url.origin));
 }

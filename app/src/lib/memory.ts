@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import type { Tags } from '@/lib/assist';
 import type { Lang } from '@/lib/i18n';
+import { currentSettings } from '@/lib/settings';
 import { readJSON, writeJSON } from '@/lib/storage';
 
 /**
@@ -22,7 +23,8 @@ export type MemoryItem = {
 
 const MAX_REMEMBER = 100;
 const MAX_SEEN = 60;
-const DIR = new Directory(Paths.document, 'memory');
+// Made on first use: building the app evaluates this file where there's no file system.
+const dir = () => new Directory(Paths.document, 'memory');
 
 let items: MemoryItem[] = readJSON<MemoryItem[]>('memory', []);
 const listeners = new Set<(items: MemoryItem[]) => void>();
@@ -40,8 +42,8 @@ function key(label: string) {
 function savePhoto(id: string, base64?: string) {
   if (!base64) return undefined;
   try {
-    if (!DIR.exists) DIR.create();
-    const f = new File(DIR, `${id}.jpg`);
+    if (!dir().exists) dir().create();
+    const f = new File(dir(), `${id}.jpg`);
     f.create();
     f.write(base64, { encoding: 'base64' });
     return f.uri;
@@ -79,11 +81,20 @@ export function recordTags(tags: Tags, photo?: string) {
 
 /** One line per entry, newest first, for the model. */
 export function memoryNotes(lang: Lang): string[] {
-  return items.slice(0, 40).map((m) => {
+  return [...personalNotes(lang), ...items.slice(0, 40).map((m) => {
     const when = ago(m.at, lang);
     if (lang === 'en') return `${m.label}: ${m.note} (${m.kind === 'remember' ? 'they asked you to remember this, ' : 'seen '}${when})`;
     return `${m.label}: ${m.note} (${m.kind === 'remember' ? 'طلب منك تتذكره ' : 'شفته '}${when})`;
-  });
+  })];
+}
+
+/** The user's own instructions from Personalization, sent first with every request. */
+function personalNotes(lang: Lang): string[] {
+  const { aboutMe, responseStyle } = currentSettings();
+  const out: string[] = [];
+  if (aboutMe.trim()) out.push(lang === 'en' ? `About the user, in their words: ${aboutMe.trim()}` : `عن المستخدم بكلامه: ${aboutMe.trim()}`);
+  if (responseStyle.trim()) out.push(lang === 'en' ? `How the user wants you to answer (follow this): ${responseStyle.trim()}` : `كيف يبيك المستخدم ترد (التزم بهذا): ${responseStyle.trim()}`);
+  return out;
 }
 
 export function forget(id: string) {

@@ -1,203 +1,144 @@
-import { useCameraPermissions, type CameraView } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMemo, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 
-import { CameraPreview } from '@/components/camera-preview';
-import { CircleButton, Field, PillButton, ScreenHeader } from '@/components/chrome';
+import { InstallSheet } from '@/components/install-sheet';
+import { SignInCard } from '@/components/sign-in-card';
 import { Text } from '@/components/text';
-import { MinTouch, Radius, Spacing, useColors } from '@/constants/theme';
+import { Banner, Card, Chip, EmptyState, ErrorState, IconBadge, LargeTitle, Screen, SearchField, SectionHeader, SenseCard, SkeletonList, useToast } from '@/components/ui';
+import { Spacing } from '@/constants/theme';
+import { checkCompat } from '@/lib/compat';
+import { useGlasses } from '@/lib/glasses';
 import { useI18n } from '@/lib/i18n';
-import { confirmWithUser, createPhoneAdapters } from '@/lib/sense-adapters';
-import { setInstalledEnabled, signInWithPassword, signOutVision, useInstalled, useVisionSession, visionClient, type InstalledSense } from '@/lib/vision';
-import { BUILTIN_SENSES, missingCapabilities, runWorkflow, type Permission, type RunResult } from '@mibyan/shared/sense';
-
-const L = {
-  ar: {
-    title: 'الحواس', introAccount: 'الحواس المثبّتة في حسابك على الويب. التغييرات تظهر هنا عند التحديث.', introLocal: 'حواس مدمجة. لم يُضبط حساب للمزامنة بعد.',
-    run: 'تشغيل', running: 'جارٍ التشغيل…', perms: 'الأذونات الممنوحة', unavailable: 'غير متاح بعد', needs: 'يحتاج', confirm: 'تشغيل الحاسة', allow: 'ستستخدم هذه الحاسة:',
-    ok: 'تم', failed: 'فشل', blocked: 'متوقف', skipped: 'تخطّي', steps: 'الخطوات', cam: 'كاميرا', refresh: 'تحديث', enable: 'تفعيل', disable: 'تعطيل', active: 'مفعّلة', off: 'معطّلة',
-    email: 'البريد', password: 'كلمة المرور', signIn: 'دخول', signOut: 'خروج', empty: 'لا توجد حواس مثبّتة. ثبّت من Vision Studio على الويب.', signedIn: 'مسجّل باسم', signInTitle: 'سجّل الدخول لعرض حواسك',
-    permission: { camera: 'الكاميرا', microphone: 'الميكروفون', speech_out: 'النطق بالصوت', location: 'الموقع', notifications: 'الإشعارات', store_read: 'قراءة السجلات', store_write: 'حفظ السجلات', memory_read: 'قراءة الذاكرة', memory_write: 'الكتابة في الذاكرة', tasks_write: 'إنشاء مهام', team_message: 'مراسلة الفريق', network: 'الشبكة' } as Record<string, string>,
-  },
-  en: {
-    title: 'Senses', introAccount: 'Senses installed on your account on the web. Changes appear here on refresh.', introLocal: 'Built-in Senses. No account backend is configured for sync yet.',
-    run: 'Run', running: 'Running…', perms: 'Granted permissions', unavailable: 'Not available yet', needs: 'Needs', confirm: 'Run Sense', allow: 'This Sense will use:',
-    ok: 'Done', failed: 'Failed', blocked: 'Blocked', skipped: 'Skipped', steps: 'Steps', cam: 'Camera', refresh: 'Refresh', enable: 'Enable', disable: 'Disable', active: 'Active', off: 'Disabled',
-    email: 'Email', password: 'Password', signIn: 'Sign in', signOut: 'Sign out', empty: 'No Senses installed. Install from Vision Studio on the web.', signedIn: 'Signed in as', signInTitle: 'Sign in to see your Senses',
-    permission: { camera: 'Camera', microphone: 'Microphone', speech_out: 'Spoken output', location: 'Location', notifications: 'Notifications', store_read: 'Read records', store_write: 'Save records', memory_read: 'Read memory', memory_write: 'Write memory', tasks_write: 'Create tasks', team_message: 'Message team', network: 'Network' } as Record<string, string>,
-  },
-};
+import { useSettings } from '@/lib/settings';
+import { CATEGORY_STYLE, DISPLAY_CATEGORIES, EXPERIENCE_SENSES, PACKS, displayCategory, senseDesc, senseName, setEnabled, useCatalog, useInstalledSenses, type DisplayCategory } from '@/lib/sixth';
+import { useS } from '@/lib/strings';
+import { useVisionSession } from '@/lib/vision';
+import type { SenseManifest } from '@mibyan/shared/sense';
 
 export default function SensesScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const c = useColors();
-  const { lang, dir, t } = useI18n();
-  const s = L[lang];
-  const [camPerm, requestCamPerm] = useCameraPermissions();
-  const cameraRef = useRef<CameraView>(null);
-  const readyRef = useRef(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, RunResult>>({});
+  const s = useS();
+  const { lang } = useI18n();
+  const toast = useToast();
+  const { settings } = useSettings();
+  const glasses = useGlasses();
   const session = useVisionSession();
-  const hasBackend = !!visionClient;
-  const signedIn = !!session.email;
-  const installed = useInstalled(signedIn);
-  const [formEmail, setFormEmail] = useState('');
-  const [formPassword, setFormPassword] = useState('');
-  const [authError, setAuthError] = useState<string | null>(null);
+  const installed = useInstalledSenses();
+  const catalog = useCatalog();
+  const [q, setQ] = useState('');
+  const [cat, setCat] = useState<DisplayCategory | 'all'>('all');
+  const [pack, setPack] = useState<SenseManifest[] | null>(null);
 
-  // Same capability set as the runtime adapters; used only to tell which Senses can run.
-  const available = useMemo(() => createPhoneAdapters({ lang }), [lang]);
+  const match = (m: SenseManifest) =>
+    (cat === 'all' || displayCategory(m) === cat) &&
+    (!q.trim() || `${senseName(m, lang)} ${senseDesc(m, lang)} ${m.name_en}`.toLowerCase().includes(q.trim().toLowerCase()));
 
-  const items: InstalledSense[] = hasBackend
-    ? installed.items
-    : BUILTIN_SENSES.map((m) => ({ manifest: m, enabled: true, granted: m.permissions, settings: {}, version: m.version }));
-
-  const run = async (item: InstalledSense) => {
-    const sense = item.manifest;
-    const name = lang === 'ar' ? sense.name_ar : sense.name_en;
-    const list = item.granted.map((p) => s.permission[p] ?? p).join('، ');
-    const ok = await confirmWithUser(`${s.confirm}: ${name}`, `${s.allow} ${list}`);
-    if (!ok) return;
-    if (item.granted.includes('camera') && !camPerm?.granted) await requestCamPerm();
-    setBusy(sense.id);
-    const adapters = createPhoneAdapters({
-      lang,
-      phoneCapture: async () => {
-        if (!readyRef.current || !cameraRef.current) return undefined;
-        return (await cameraRef.current.takePictureAsync({ quality: 0.5, shutterSound: false })).uri;
-      },
-    });
-    try {
-      // `granted` is what the person consented to when installing, not what the manifest asks for.
-      const result = await runWorkflow(sense, {
-        granted: item.granted as Permission[],
-        adapters,
-        settings: item.settings,
-        approve: (_id, kind) => confirmWithUser(kind, kind),
-      });
-      setResults((r) => ({ ...r, [sense.id]: result }));
-      const failed = result.steps.find((x) => x.status === 'failed');
-      AccessibilityInfo.announceForAccessibility(failed ? `${s.failed}: ${failed.error}` : s.ok);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      setResults((r) => ({ ...r, [sense.id]: { status: 'failed', steps: [{ nodeId: '-', kind: 'trigger.manual', status: 'failed', startedAt: Date.now(), ms: 0, error: message }], outputs: {}, aiCalls: 0 } }));
-      AccessibilityInfo.announceForAccessibility(`${s.failed}: ${message}`);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const toggle = async (item: InstalledSense) => {
-    try {
-      await setInstalledEnabled(item.manifest.id, !item.enabled);
-      installed.refresh();
-    } catch (e) {
-      setAuthError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const doSignIn = async () => {
-    setAuthError(null);
-    try {
-      await signInWithPassword(formEmail.trim(), formPassword);
-    } catch (e) {
-      setAuthError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  const ids = useMemo(() => new Set(installed.items.map((i) => i.manifest.id)), [installed.items]);
+  const mine = installed.items.filter((i) => match(i.manifest));
+  const preferred = EXPERIENCE_SENSES[settings.experience];
+  const recommended = catalog.items.filter((m) => !ids.has(m.id) && match(m)).sort((a, b) => Number(preferred.includes(b.id)) - Number(preferred.includes(a.id)));
+  const ctx = { glassesReady: glasses.status === 'ready', signedIn: !!session.email, lang };
+  const byId = (id: string) => catalog.items.find((m) => m.id === id);
+  const packTitle = { accessibility: s.packAccessibility, work: s.packWork, everyday: s.packEveryday };
+  const showPacks = !q.trim() && cat === 'all';
 
   return (
-    <View style={[styles.root, { backgroundColor: c.surface, direction: dir, paddingTop: insets.top + Spacing.two }]}>
-      <ScreenHeader
-        title={s.title}
-        closeLabel={t.close}
-        onClose={() => router.back()}
-        trailing={hasBackend && signedIn ? <CircleButton icon="arrow.clockwise" label={s.refresh} onPress={installed.refresh} /> : null}
-      />
-      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + Spacing.four }]} keyboardShouldPersistTaps="handled">
-        <Text tone="secondary">{hasBackend ? s.introAccount : s.introLocal}</Text>
-
-        {hasBackend && !session.ready ? null : hasBackend && !signedIn ? (
-          <View style={[styles.card, { backgroundColor: c.card }]}>
-            <Text variant="heading" accessibilityRole="header">{s.signInTitle}</Text>
-            <Field label={s.email} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" value={formEmail} onChangeText={setFormEmail} />
-            <Field label={s.password} secureTextEntry textContentType="password" autoComplete="current-password" value={formPassword} onChangeText={setFormPassword} onSubmitEditing={() => void doSignIn()} />
-            {authError && <Text tone="danger" accessibilityLiveRegion="polite">{authError}</Text>}
-            <PillButton label={s.signIn} onPress={() => void doSignIn()} />
-          </View>
-        ) : (
-          <>
-            {hasBackend && (
-              <View style={styles.rowBetween}>
-                <Text variant="caption" tone="secondary" style={{ flex: 1 }}>{s.signedIn} {session.email}</Text>
-                <Pressable accessibilityRole="button" accessibilityLabel={s.signOut} onPress={() => void signOutVision()} style={styles.link}><Text variant="caption" tone="accent">{s.signOut}</Text></Pressable>
-              </View>
-            )}
-            {authError && <Text tone="danger" accessibilityLiveRegion="polite">{authError}</Text>}
-            {installed.error && <Text tone="danger" accessibilityLiveRegion="polite">{installed.error}</Text>}
-            <View style={[styles.preview, { backgroundColor: c.card }]} accessibilityLabel={s.cam}>
-              <CameraPreview cameraRef={cameraRef} readyRef={readyRef} granted={!!camPerm?.granted} iconSize={36} iconColor={c.textSecondary} />
-            </View>
-            {hasBackend && !installed.loading && !installed.error && items.length === 0 && <Text tone="secondary">{s.empty}</Text>}
-            {items.map((item) => {
-              const sense = item.manifest;
-              const missing = missingCapabilities(sense.workflow, available);
-              const result = results[sense.id];
-              const name = lang === 'ar' ? sense.name_ar : sense.name_en;
-              return (
-                <View key={sense.id} style={[styles.card, { backgroundColor: c.card }]}>
-                  <View style={styles.rowBetween}>
-                    <Text variant="heading" accessibilityRole="header" style={{ flex: 1 }}>{name}</Text>
-                    {hasBackend && <Text variant="caption" tone={item.enabled ? 'accent' : 'tertiary'}>{item.enabled ? s.active : s.off}</Text>}
-                  </View>
-                  <Text tone="secondary">{lang === 'ar' ? sense.description_ar : sense.description_en}</Text>
-                  <Text variant="caption" tone="tertiary">{s.perms}: {item.granted.map((p) => s.permission[p] ?? p).join('، ') || '-'}</Text>
-                  {missing.length > 0 ? (
-                    <Text variant="caption" tone="tertiary" accessibilityLabel={`${s.unavailable}. ${s.needs} ${missing.join(', ')}`}>{s.unavailable} · {s.needs}: {missing.join(', ')}</Text>
-                  ) : item.enabled ? (
-                    <PillButton
-                      icon="play.fill"
-                      label={busy === sense.id ? s.running : s.run}
-                      accessibilityLabel={`${s.run} ${name}`}
-                      busy={busy === sense.id}
-                      disabled={busy !== null}
-                      onPress={() => void run(item)}
-                    />
-                  ) : null}
-                  {hasBackend && (
-                    <Pressable accessibilityRole="button" accessibilityLabel={`${item.enabled ? s.disable : s.enable} ${name}`} onPress={() => void toggle(item)} style={styles.link}>
-                      <Text variant="caption" tone="accent">{item.enabled ? s.disable : s.enable}</Text>
-                    </Pressable>
-                  )}
-                  {result && (
-                    <View accessibilityLiveRegion="polite" style={styles.steps}>
-                      <Text variant="caption" tone="secondary">{s.steps}</Text>
-                      {result.steps.map((st) => (
-                        <Text key={st.nodeId + st.startedAt} variant="caption" tone={st.status === 'failed' ? 'danger' : 'secondary'}>
-                          {s[st.status]} · {st.nodeId}{st.error ? ` — ${st.error}` : ''}
-                        </Text>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </>
-        )}
+    <Screen onRefresh={() => { installed.refresh(); catalog.refresh(); }} refreshing={installed.loading}>
+      <LargeTitle>{s.sensesTitle}</LargeTitle>
+      <SearchField value={q} onChange={setQ} placeholder={s.searchSenses} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.two }}>
+        <Chip label={s.allCategories} selected={cat === 'all'} onPress={() => setCat('all')} />
+        {DISPLAY_CATEGORIES.map((k) => (
+          <Chip key={k} label={s.cat[k]} icon={CATEGORY_STYLE[k].icon} selected={cat === k} onPress={() => setCat(k)} />
+        ))}
       </ScrollView>
-    </View>
+
+      {installed.offline && <Banner message={s.offlineBanner} />}
+      {/* Marketplace entry */}
+      <Card onPress={() => router.push('/marketplace')} label={`${s.marketplace}. ${s.marketplaceBody}`} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.three }}>
+        <IconBadge icon="bag.fill" hue="#8B5CF6" />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="heading">{s.marketplace}</Text>
+          <Text variant="caption" tone="secondary">{s.marketplaceBody}</Text>
+        </View>
+      </Card>
+
+      {/* Installed */}
+      <View style={{ gap: Spacing.two }}>
+        <SectionHeader title={s.yourSenses} />
+        {!installed.ready ? (
+          <SkeletonList />
+        ) : installed.error && !installed.items.length ? (
+          <ErrorState message={installed.error} onRetry={installed.refresh} />
+        ) : mine.length ? (
+          mine.map((i) => {
+            const k = checkCompat(i.manifest, ctx);
+            return (
+              <SenseCard
+                key={i.manifest.id}
+                sense={i.manifest}
+                installed
+                active={i.enabled}
+                compatible={k.runnable}
+                onPress={() => router.push(`/sense/${i.manifest.id}`)}
+                onToggle={(v) => {
+                  if (v && !k.runnable) return toast(s.sdNotRunnable, 'error');
+                  setEnabled(i.manifest.id, v).catch((e) => toast(e instanceof Error ? e.message : String(e), 'error'));
+                }}
+              />
+            );
+          })
+        ) : (
+          <EmptyState icon="sparkles" title={installed.items.length ? s.noSensesFound : s.noInstalled} body={installed.items.length ? undefined : s.noInstalledBody} action={{ label: s.marketplace, onPress: () => router.push('/marketplace') }} />
+        )}
+      </View>
+
+      {installed.ready && !session.email && <SignInCard />}
+
+      {/* Packs */}
+      {showPacks && (
+        <View style={{ gap: Spacing.two }}>
+          <SectionHeader title={s.packs} />
+          {PACKS.filter((p) => p.id !== 'everyday').map((p) => {
+            const list = p.senses.map(byId).filter((m): m is SenseManifest => !!m);
+            if (!list.length) return null;
+            const all = list.every((m) => ids.has(m.id));
+            return (
+              <Card key={p.id} onPress={() => (all ? router.push(`/sense/${list[0].id}`) : setPack(list))} label={`${packTitle[p.id]}. ${s.packBody(list.length)}`} style={{ gap: Spacing.one }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.three }}>
+                  <IconBadge icon={p.id === 'work' ? 'wrench.and.screwdriver.fill' : 'figure.wave'} hue={p.id === 'work' ? '#38D5F0' : '#8B5CF6'} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text variant="heading">{packTitle[p.id]}</Text>
+                    <Text variant="caption" tone="secondary">{list.map((m) => senseName(m, lang)).join(' · ')}</Text>
+                  </View>
+                  <Text variant="caption" tone={all ? 'success' : 'accent'}>{all ? s.installed : s.installPack}</Text>
+                </View>
+              </Card>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Recommended */}
+      <View style={{ gap: Spacing.two }}>
+        <SectionHeader title={s.recommended} action={s.seeAll} onAction={() => router.push('/marketplace')} />
+        {recommended.length ? (
+          recommended.slice(0, 4).map((m) => (
+            <SenseCard
+              key={m.id}
+              sense={m}
+              compatible={checkCompat(m, ctx).deviceOk}
+              onPress={() => router.push(`/sense/${m.id}`)}
+              onInstall={() => router.push(`/sense/${m.id}?install=1`)}
+            />
+          ))
+        ) : (
+          <Text tone="secondary">{s.noSensesFound}</Text>
+        )}
+      </View>
+
+      <InstallSheet senses={pack ?? []} visible={!!pack} onClose={() => setPack(null)} />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  list: { padding: Spacing.three, gap: Spacing.three },
-  preview: { height: 160, borderRadius: Radius.md, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  card: { padding: Spacing.three, borderRadius: Radius.md, gap: Spacing.two },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.two },
-  link: { minHeight: MinTouch, justifyContent: 'center' },
-  steps: { gap: Spacing.half, marginTop: Spacing.one },
-});

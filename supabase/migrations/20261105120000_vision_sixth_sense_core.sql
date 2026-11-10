@@ -112,6 +112,11 @@ create policy "own handovers" on public.vision_handovers for all to authenticate
   using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 create policy "read own audit" on public.vision_audit_logs for select to authenticated using (user_id = (select auth.uid()));
 
+-- Some Supabase projects auto-grant ALL (incl. TRUNCATE) on new tables to anon/authenticated via
+-- default privileges, and RLS does not restrict TRUNCATE. Reset to nothing on the NEW tables only, then grant exactly what is needed.
+revoke all on public.vision_senses, public.vision_sense_versions, public.vision_sense_installations, public.vision_shifts,
+  public.vision_records, public.vision_handovers, public.vision_audit_logs from anon, authenticated;
+
 grant select on public.vision_senses, public.vision_sense_versions to authenticated;
 grant insert, update, delete on public.vision_senses, public.vision_sense_versions to authenticated;
 grant select, insert, update, delete on public.vision_sense_installations, public.vision_shifts, public.vision_records, public.vision_handovers to authenticated;

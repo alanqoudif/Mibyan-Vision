@@ -35,7 +35,9 @@ export type LiveEvent =
   | { type: 'state'; state: 'connecting' | 'live' | 'reconnecting' | 'stopped' }
   | { type: 'user' | 'model'; text: string }
   | { type: 'speaking'; speaking: boolean }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  /** Gemini asks for data only the phone has; answer with `liveToolResponse`. */
+  | { type: 'toolCall'; calls: { id: string; name: string; args?: Record<string, unknown> }[] };
 
 declare class MubayanGlassesModule extends NativeModule<Events> {
   getRegistrationState(): Promise<RegistrationState>;
@@ -67,6 +69,8 @@ declare class MubayanGlassesModule extends NativeModule<Events> {
   /** Has Gemini say an alert (spotted by the frame-by-frame look) in its voice, word for word. */
   liveSay(text: string): Promise<void>;
   liveStop(): Promise<void>;
+  /** Answers a `toolCall` live event: JSON of `{ functionResponses: [{ id, name, response }] }`. */
+  liveToolResponse(json: string): Promise<void>;
   livePause(paused: boolean): Promise<void>;
   /** A phone-camera frame (base64 JPEG) for when the glasses aren't sending video. */
   liveSendFrame(base64: string): Promise<void>;
@@ -74,6 +78,17 @@ declare class MubayanGlassesModule extends NativeModule<Events> {
   stop(): Promise<void>;
   /** On-device text recognition of a `file://` image; lines joined with newlines. */
   recognizeText(uri: string, languages: string[]): Promise<string>;
+  /**
+   * Apple Maps points of interest around a coordinate. `categories` are MKPointOfInterestCategory
+   * raw values ("MKPOICategoryPharmacy"); empty means the text query alone decides.
+   */
+  searchPlaces(
+    query: string,
+    categories: string[],
+    latitude: number,
+    longitude: number,
+    radius: number,
+  ): Promise<{ name: string; latitude: number; longitude: number; street: string }[]>;
   /** The route the last shortcut asked for (e.g. `/live`), or null. Reading it clears it. */
   takePendingShortcut(): string | null;
 }

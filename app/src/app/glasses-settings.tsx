@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Section, Segmented, rows } from '@/components/settings-rows';
 import { Text } from '@/components/text';
-import { BottomTabInset, MinTouch, OrbColors, Radius, Spacing, useColors } from '@/constants/theme';
+import { MinTouch, OrbColors, Radius, Spacing, useColors } from '@/constants/theme';
 import { useGlasses, type GlassesStatus } from '@/lib/glasses';
 import { useI18n } from '@/lib/i18n';
 import { useSettings, type Settings } from '@/lib/settings';
@@ -20,7 +20,7 @@ const DOT: Record<GlassesStatus, string> = {
   ready: '#34C759',
 };
 
-export default function GlassesScreen() {
+export default function GlassesSettingsScreen() {
   const insets = useSafeAreaInsets();
   const c = useColors();
   const { settings, update } = useSettings();
@@ -35,11 +35,11 @@ export default function GlassesScreen() {
 
   return (
     <ScrollView
-      style={[styles.root, { backgroundColor: c.surface, direction: dir }]}
+      style={[styles.root, { backgroundColor: c.background, direction: dir }]}
       onMagicTap={() => router.push({ pathname: '/session', params: { mode: 'ask' } })}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + Spacing.four, paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
+        { paddingTop: Spacing.three, paddingBottom: insets.bottom + Spacing.four },
       ]}>
       <Text variant="display" accessibilityRole="header">
         {t.devices}
