@@ -17,6 +17,7 @@ const light = {
   surfaceStrong: '#DDDAEC',
   card: '#FFFFFF',
   border: '#E1DEEE',
+  field: '#ECEAF5', // text inputs and wells that sit on a card
   text: '#0E0D18',
   textSecondary: '#4D4B63', // 7.6:1 on background
   textTertiary: '#5C5A72', // 6.0:1 on background, 5.2:1 on surface
@@ -40,6 +41,7 @@ const dark: typeof light = {
   surfaceStrong: '#1B1B28',
   card: '#13131C',
   border: '#24243A',
+  field: '#1B1B28', // one step above card; surface is too close to read as a well
   text: '#F4F3FA',
   textSecondary: '#A8A7BD', // 8.4:1 on background
   textTertiary: '#8F8EA6', // 6.3:1 on background, 5.6:1 on surface
@@ -89,6 +91,16 @@ export function useColors(): Palette {
   const [accent, accentText] = a[scheme];
   return { ...base, accent, accentText, glow: a.swatch };
 }
+
+/**
+ * Alerts drawn over the camera feed. They sit on video, not on the theme background, so they
+ * don't switch with light/dark. Both pass 4.5:1 for caption text.
+ */
+export const CameraAlert = {
+  danger: { fill: '#C2122F', text: '#FFFFFF' }, // 6.0:1
+  warning: { fill: '#FF9F0A', text: '#0A1317' }, // 9.6:1 (white on this orange was 2.2:1)
+  scrim: 'rgba(0,0,0,0.6)', // white caption stays >= 4.5:1 over a bright frame
+} as const;
 
 /** The Sense Orb gradient: violet → indigo → cyan. */
 export const OrbColors = ['#7C4DEB', '#4F46E5', '#22D3EE', '#8B5CF6', '#7C4DEB'] as const;
